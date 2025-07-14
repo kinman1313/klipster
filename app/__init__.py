@@ -5,10 +5,14 @@ from app.models import db, User, Clip
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 import os
 
+import openai
+
 def create_app():
     app = Flask(__name__)
     app.config['SECRET_KEY'] = 'your_secret_key'
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///db.sqlite'
+    app.config['OPENAI_API_KEY'] = os.getenv("OPENAI_API_KEY")
+    openai.api_key = app.config['OPENAI_API_KEY']
     db.init_app(app)
 
     login_manager = LoginManager()

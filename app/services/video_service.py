@@ -11,31 +11,41 @@ def download_video(url):
     video_path = stream.download(output_path='downloads')
     return video_path
 
+import openai
+
 def transcribe_video(video_path):
-    r = sr.Recognizer()
-    with sr.AudioFile(video_path) as source:
-        audio = r.record(source)
-    return r.recognize_google(audio)
+    with open(video_path, "rb") as audio_file:
+        transcript = openai.audio.transcriptions.create(
+            model="whisper-1",
+            file=audio_file,
+            response_format="verbose_json"
+        )
+    return transcript['text']
 
 from moviepy.video.VideoClip import TextClip
 from moviepy.video.compositing.CompositeVideoClip import CompositeVideoClip
 from scenedetect import open_video, SceneManager
 from scenedetect.detectors import ContentDetector
 
-def find_scenes(video_path, threshold=30.0):
-    video = open_video(video_path)
-    scene_manager = SceneManager()
-    scene_manager.add_detector(ContentDetector(threshold=threshold))
-    scene_manager.detect_scenes(video=video)
-    return scene_manager.get_scene_list()
+import json
+
+def find_key_moments(transcription):
+    response = openai.chat.completions.create(
+        model="gpt-3.5-turbo",
+        messages=[
+            {"role": "system", "content": "You are a helpful assistant that identifies key moments in a video transcription. Respond with a JSON object containing a list of key moments, each with a start_time and end_time in seconds."},
+            {"role": "user", "content": f"Here is the transcription:\n\n{transcription}\n\nPlease identify the key moments."}
+        ]
+    )
+    return json.loads(response.choices[0].message.content)
 
 def generate_clips(video_path, transcription, subtitle_color='white', emojis=None, effects=None):
-    scene_list = find_scenes(video_path)
+    key_moments = find_key_moments(transcription)
     video_clip = VideoFileClip(video_path)
     clip_paths = []
 
-    for i, scene in enumerate(scene_list):
-        start_time, end_time = scene[0].get_seconds(), scene[1].get_seconds()
+    for i, moment in enumerate(key_moments['moments']):
+        start_time, end_time = moment['start_time'], moment['end_time']
 
         # Create a text clip for subtitles
         subtitle_text = transcription
