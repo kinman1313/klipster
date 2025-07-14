@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, render_template
 from app.services.video_service import download_video, generate_clips, transcribe_video
 from app.services.scheduler_service import schedule_upload
 import os
@@ -9,6 +9,10 @@ def create_app():
     def upload_task(clip_path):
         # Placeholder for social media upload logic
         print(f"Uploading clip: {clip_path}")
+
+    @app.route('/')
+    def index():
+        return render_template('index.html')
 
     @app.route('/api/clip', methods=['POST'])
     def clip_video():

@@ -1,0 +1,34 @@
+body {
+    font-family: sans-serif;
+    margin: 2em;
+}
+
+h1 {
+    text-align: center;
+}
+
+form {
+    display: flex;
+    flex-direction: column;
+    width: 50%;
+    margin: 0 auto;
+}
+
+label {
+    margin-top: 1em;
+}
+
+input, button {
+    padding: 0.5em;
+    margin-top: 0.5em;
+}
+
+button {
+    margin-top: 1em;
+    cursor: pointer;
+}
+
+#response {
+    margin-top: 2em;
+    text-align: center;
+}
