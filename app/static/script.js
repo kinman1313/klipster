@@ -7,6 +7,8 @@ document.getElementById('clip-form').addEventListener('submit', async (event) =>
     const subtitleColor = formData.get('subtitle-color');
     const emojis = formData.get('emojis');
     const effects = formData.get('effects');
+    const scheduleInterval = formData.get('schedule-interval');
+    const scheduleUnit = formData.get('schedule-unit');
     const responseContainer = document.getElementById('response');
 
     responseContainer.innerHTML = 'Generating clip...';
@@ -21,7 +23,9 @@ document.getElementById('clip-form').addEventListener('submit', async (event) =>
                 url: youtubeUrl,
                 subtitle_color: subtitleColor,
                 emojis: emojis,
-                effects: effects
+                effects: effects,
+                schedule_interval: scheduleInterval,
+                schedule_unit: scheduleUnit
             })
         });
 

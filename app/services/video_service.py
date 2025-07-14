@@ -19,32 +19,44 @@ def transcribe_video(video_path):
 
 from moviepy.video.VideoClip import TextClip
 from moviepy.video.compositing.CompositeVideoClip import CompositeVideoClip
+from scenedetect import open_video, SceneManager
+from scenedetect.detectors import ContentDetector
+
+def find_scenes(video_path, threshold=30.0):
+    video = open_video(video_path)
+    scene_manager = SceneManager()
+    scene_manager.add_detector(ContentDetector(threshold=threshold))
+    scene_manager.detect_scenes(video=video)
+    return scene_manager.get_scene_list()
 
 def generate_clips(video_path, transcription, subtitle_color='white', emojis=None, effects=None):
+    scene_list = find_scenes(video_path)
     video_clip = VideoFileClip(video_path)
+    clip_paths = []
 
-    # Simple logic to find a key part
-    start_time = 5
-    end_time = 15
+    for i, scene in enumerate(scene_list):
+        start_time, end_time = scene[0].get_seconds(), scene[1].get_seconds()
 
-    # Create a text clip for subtitles
-    subtitle_text = transcription
-    if emojis:
-        subtitle_text = f"{emojis} {subtitle_text}"
+        # Create a text clip for subtitles
+        subtitle_text = transcription
+        if emojis:
+            subtitle_text = f"{emojis} {subtitle_text}"
 
-    subtitle = TextClip(subtitle_text, fontsize=24, color=subtitle_color, bg_color='black')
-    subtitle = subtitle.set_pos(('center', 'bottom')).set_duration(end_time - start_time)
+        subtitle = TextClip(subtitle_text, fontsize=24, color=subtitle_color, bg_color='black')
+        subtitle = subtitle.set_pos(('center', 'bottom')).set_duration(end_time - start_time)
 
-    # Composite the video and subtitle
-    final_clip = CompositeVideoClip([video_clip.subclip(start_time, end_time), subtitle])
+        # Composite the video and subtitle
+        final_clip = CompositeVideoClip([video_clip.subclip(start_time, end_time), subtitle])
 
-    if effects:
-        # Placeholder for applying effects
-        pass
+        if effects:
+            # Placeholder for applying effects
+            pass
 
-    if not os.path.exists('clips'):
-        os.makedirs('clips')
+        if not os.path.exists('clips'):
+            os.makedirs('clips')
 
-    clip_path = os.path.join('clips', f"clip_{os.path.basename(video_path)}")
-    final_clip.write_videofile(clip_path, codec='libx264')
-    return clip_path
+        clip_path = os.path.join('clips', f"clip_{i}_{os.path.basename(video_path)}")
+        final_clip.write_videofile(clip_path, codec='libx264')
+        clip_paths.append(clip_path)
+
+    return clip_paths

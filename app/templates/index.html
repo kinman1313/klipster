@@ -17,6 +17,13 @@
         <input type="text" id="emojis" name="emojis">
         <label for="effects">Effects:</label>
         <input type="text" id="effects" name="effects">
+        <label for="schedule-interval">Schedule Interval:</label>
+        <input type="number" id="schedule-interval" name="schedule-interval">
+        <label for="schedule-unit">Schedule Unit:</label>
+        <select id="schedule-unit" name="schedule-unit">
+            <option value="minutes">Minutes</option>
+            <option value="hours">Hours</option>
+        </select>
         <button type="submit">Generate Clip</button>
     </form>
     <div id="response"></div>
