@@ -1,7 +1,6 @@
 from pytube import YouTube
 import os
 from moviepy.video.io.VideoFileClip import VideoFileClip
-import speech_recognition as sr
 
 def download_video(url):
     yt = YouTube(url)
