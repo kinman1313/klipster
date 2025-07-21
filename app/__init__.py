@@ -50,7 +50,7 @@ def create_app():
         return "Logged out"
 
     @app.route('/api/clip', methods=['POST'])
-    @login_required
+    # @login_required
     def clip_video():
         data = request.get_json()
         youtube_url = data.get('url')
@@ -68,11 +68,11 @@ def create_app():
             transcription = transcribe_video(video_path)
             clip_paths = generate_clips(video_path, transcription, subtitle_color, emojis, effects)
 
-            for clip_path in clip_paths:
-                new_clip = Clip(user_id=current_user.id, clip_path=clip_path, transcription=transcription, subtitle_color=subtitle_color, emojis=emojis, effects=effects)
-                db.session.add(new_clip)
+            # for clip_path in clip_paths:
+            #     new_clip = Clip(user_id=current_user.id, clip_path=clip_path, transcription=transcription, subtitle_color=subtitle_color, emojis=emojis, effects=effects)
+            #     db.session.add(new_clip)
 
-            db.session.commit()
+            # db.session.commit()
 
             if schedule_interval and schedule_unit:
                 schedule_upload(lambda: upload_task(clip_paths), schedule_interval, schedule_unit)
