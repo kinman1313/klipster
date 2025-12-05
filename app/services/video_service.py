@@ -33,26 +33,35 @@ def transcribe_video(video_path):
 
 from moviepy.video.VideoClip import TextClip
 from moviepy.video.compositing.CompositeVideoClip import CompositeVideoClip
-# Import effects using the correct moviepy structure
-try:
-    # Try newer moviepy import style first
-    from moviepy.video.fx.fadein import fadein
-    from moviepy.video.fx.fadeout import fadeout
-    from moviepy.video.fx.speedx import speedx
-except ImportError:
-    # Fallback to older import style
-    try:
-        from moviepy.video.fx import fadein, fadeout, speedx
-    except ImportError:
-        # If still failing, import as module
-        import moviepy.video.fx.all as vfx
-        fadein = vfx.fadein
-        fadeout = vfx.fadeout
-        speedx = vfx.speedx
 from scenedetect import open_video, SceneManager
 from scenedetect.detectors import ContentDetector
 
 import json
+
+# Import moviepy effects - handle different versions
+def get_moviepy_effects():
+    """Get moviepy effect functions compatible with installed version."""
+    try:
+        # Try moviepy 1.0.3+ style
+        from moviepy.video.fx.fadein import fadein
+        from moviepy.video.fx.fadeout import fadeout
+        from moviepy.video.fx.speedx import speedx
+        return fadein, fadeout, speedx
+    except (ImportError, ModuleNotFoundError):
+        try:
+            # Try older import style
+            from moviepy.video.fx import fadein, fadeout, speedx
+            return fadein, fadeout, speedx
+        except (ImportError, AttributeError):
+            try:
+                # Try vfx module style
+                import moviepy.video.fx.all as vfx
+                return vfx.fadein, vfx.fadeout, vfx.speedx
+            except (ImportError, ModuleNotFoundError, AttributeError):
+                # Last resort: return None and we'll handle effects manually
+                return None, None, None
+
+fadein, fadeout, speedx = get_moviepy_effects()
 
 def find_key_moments(transcription_data):
     """
@@ -137,14 +146,26 @@ def apply_effects(clip, effects_str):
         try:
             if effect_name == 'speed':
                 speed_factor = float(effect_value)
-                clip = clip.fx(speedx, speed_factor)
+                if speedx is not None:
+                    clip = clip.fx(speedx, speed_factor)
+                else:
+                    # Manual speed effect if import failed
+                    clip = clip.speedx(speed_factor)
             elif effect_name == 'fadein':
                 duration = float(effect_value)
-                clip = clip.fx(fadein, duration)
+                if fadein is not None:
+                    clip = clip.fx(fadein, duration)
+                else:
+                    # Manual fadein if import failed
+                    clip = clip.fadein(duration)
             elif effect_name == 'fadeout':
                 duration = float(effect_value)
-                clip = clip.fx(fadeout, duration)
-        except (ValueError, TypeError) as e:
+                if fadeout is not None:
+                    clip = clip.fx(fadeout, duration)
+                else:
+                    # Manual fadeout if import failed
+                    clip = clip.fadeout(duration)
+        except (ValueError, TypeError, AttributeError) as e:
             print(f"Warning: Could not apply effect '{effect}': {e}")
             continue
 
