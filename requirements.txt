@@ -1,3 +1,9 @@
 flask
+flask-sqlalchemy
+flask-login
 pytube
 moviepy
+openai
+scenedetect[opencv]
+instaloader
+schedule
