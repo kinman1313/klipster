@@ -23,6 +23,7 @@ def transcribe_video(video_path):
 
 from moviepy.video.VideoClip import TextClip
 from moviepy.video.compositing.CompositeVideoClip import CompositeVideoClip
+from moviepy.video.fx import fadein, fadeout, speedx
 from scenedetect import open_video, SceneManager
 from scenedetect.detectors import ContentDetector
 
@@ -37,6 +38,45 @@ def find_key_moments(transcription):
         ]
     )
     return json.loads(response.choices[0].message.content)
+
+def apply_effects(clip, effects_str):
+    """
+    Apply video effects based on a comma-separated string of effect specifications.
+
+    Supported effects:
+    - speed:X (e.g., "speed:1.5" for 1.5x speed, "speed:0.5" for slow motion)
+    - fadein:X (e.g., "fadein:1" for 1 second fade in)
+    - fadeout:X (e.g., "fadeout:1" for 1 second fade out)
+
+    Example: "speed:1.5,fadein:0.5,fadeout:0.5"
+    """
+    if not effects_str:
+        return clip
+
+    effects_list = [e.strip() for e in effects_str.split(',')]
+
+    for effect in effects_list:
+        if ':' not in effect:
+            continue
+
+        effect_name, effect_value = effect.split(':', 1)
+        effect_name = effect_name.strip().lower()
+
+        try:
+            if effect_name == 'speed':
+                speed_factor = float(effect_value)
+                clip = clip.fx(speedx, speed_factor)
+            elif effect_name == 'fadein':
+                duration = float(effect_value)
+                clip = clip.fx(fadein, duration)
+            elif effect_name == 'fadeout':
+                duration = float(effect_value)
+                clip = clip.fx(fadeout, duration)
+        except (ValueError, TypeError) as e:
+            print(f"Warning: Could not apply effect '{effect}': {e}")
+            continue
+
+    return clip
 
 def generate_clips(video_path, transcription, subtitle_color='white', emojis=None, effects=None):
     key_moments = find_key_moments(transcription)
@@ -54,12 +94,15 @@ def generate_clips(video_path, transcription, subtitle_color='white', emojis=Non
         subtitle = TextClip(subtitle_text, fontsize=24, color=subtitle_color, bg_color='black')
         subtitle = subtitle.set_pos(('center', 'bottom')).set_duration(end_time - start_time)
 
-        # Composite the video and subtitle
-        final_clip = CompositeVideoClip([video_clip.subclip(start_time, end_time), subtitle])
+        # Create the subclip
+        clip_segment = video_clip.subclip(start_time, end_time)
 
+        # Apply effects if specified
         if effects:
-            # Placeholder for applying effects
-            pass
+            clip_segment = apply_effects(clip_segment, effects)
+
+        # Composite the video and subtitle
+        final_clip = CompositeVideoClip([clip_segment, subtitle])
 
         if not os.path.exists('clips'):
             os.makedirs('clips')
