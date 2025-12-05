@@ -33,7 +33,22 @@ def transcribe_video(video_path):
 
 from moviepy.video.VideoClip import TextClip
 from moviepy.video.compositing.CompositeVideoClip import CompositeVideoClip
-from moviepy.video.fx import fadein, fadeout, speedx
+# Import effects using the correct moviepy structure
+try:
+    # Try newer moviepy import style first
+    from moviepy.video.fx.fadein import fadein
+    from moviepy.video.fx.fadeout import fadeout
+    from moviepy.video.fx.speedx import speedx
+except ImportError:
+    # Fallback to older import style
+    try:
+        from moviepy.video.fx import fadein, fadeout, speedx
+    except ImportError:
+        # If still failing, import as module
+        import moviepy.video.fx.all as vfx
+        fadein = vfx.fadein
+        fadeout = vfx.fadeout
+        speedx = vfx.speedx
 from scenedetect import open_video, SceneManager
 from scenedetect.detectors import ContentDetector
 
