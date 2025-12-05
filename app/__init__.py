@@ -65,20 +65,33 @@ def create_app():
 
         try:
             video_path = download_video(youtube_url)
-            transcription = transcribe_video(video_path)
-            clip_paths = generate_clips(video_path, transcription, subtitle_color, emojis, effects)
+            transcription_data = transcribe_video(video_path)
+            clip_paths = generate_clips(video_path, transcription_data, subtitle_color, emojis, effects)
+
+            # Extract full text for storage in database
+            full_transcription = transcription_data.get('text', '')
 
             for clip_path in clip_paths:
-                new_clip = Clip(user_id=current_user.id, clip_path=clip_path, transcription=transcription, subtitle_color=subtitle_color, emojis=emojis, effects=effects)
+                new_clip = Clip(user_id=current_user.id, clip_path=clip_path, transcription=full_transcription, subtitle_color=subtitle_color, emojis=emojis, effects=effects)
                 db.session.add(new_clip)
 
             db.session.commit()
 
             if schedule_interval and schedule_unit:
                 schedule_upload(lambda: upload_task(clip_paths), schedule_interval, schedule_unit)
-                return jsonify({'message': 'Clip generation and scheduling successful', 'paths': clip_paths, 'transcription': transcription})
+                return jsonify({
+                    'message': 'Clip generation and scheduling successful',
+                    'paths': clip_paths,
+                    'transcription': full_transcription,
+                    'clips_generated': len(clip_paths)
+                })
 
-            return jsonify({'message': 'Clip generated successfully', 'paths': clip_paths, 'transcription': transcription})
+            return jsonify({
+                'message': 'Clip generated successfully',
+                'paths': clip_paths,
+                'transcription': full_transcription,
+                'clips_generated': len(clip_paths)
+            })
         except Exception as e:
             return jsonify({'error': str(e)}), 500
 
