@@ -2,6 +2,8 @@
 
 Automatically generate engaging 30 second to 2 minute social media clips from YouTube videos using AI.
 
+> 🪟 **Windows Users:** See the detailed [Windows Setup Guide](WINDOWS_SETUP.md) for step-by-step instructions!
+
 ## Features
 
 - 🎬 Download videos from YouTube
