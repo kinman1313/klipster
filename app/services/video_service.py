@@ -36,20 +36,58 @@ def transcribe_video(video_path):
     """
     Transcribe video using Whisper and return both full text and timestamped segments.
     Returns a dict with 'text' (full transcription) and 'segments' (timestamped segments).
-    """
-    with open(video_path, "rb") as audio_file:
-        transcript = openai.audio.transcriptions.create(
-            model="whisper-1",
-            file=audio_file,
-            response_format="verbose_json",
-            timestamp_granularities=["segment"]
-        )
 
-    # Return both full text and segments with timestamps
-    return {
-        'text': transcript.text,
-        'segments': transcript.segments if hasattr(transcript, 'segments') else []
-    }
+    Extracts audio from video and compresses if needed to stay under Whisper's 25MB limit.
+    """
+    # Extract audio from video to a temporary file
+    audio_path = video_path.rsplit('.', 1)[0] + '_audio.mp3'
+
+    try:
+        # Use moviepy to extract audio
+        from moviepy.editor import VideoFileClip
+        video = VideoFileClip(video_path)
+        video.audio.write_audiofile(audio_path, codec='mp3', bitrate='64k', logger=None)
+        video.close()
+
+        # Check file size (Whisper has 25MB limit)
+        audio_size_mb = os.path.getsize(audio_path) / (1024 * 1024)
+        print(f"Audio file size: {audio_size_mb:.2f} MB")
+
+        if audio_size_mb > 24:
+            # Re-encode with lower bitrate if too large
+            print("Audio too large, re-encoding with lower bitrate...")
+            temp_path = audio_path.replace('.mp3', '_temp.mp3')
+            os.rename(audio_path, temp_path)
+
+            video = VideoFileClip(video_path)
+            video.audio.write_audiofile(audio_path, codec='mp3', bitrate='32k', logger=None)
+            video.close()
+            os.remove(temp_path)
+
+        # Transcribe using Whisper
+        with open(audio_path, "rb") as audio_file:
+            transcript = openai.audio.transcriptions.create(
+                model="whisper-1",
+                file=audio_file,
+                response_format="verbose_json",
+                timestamp_granularities=["segment"]
+            )
+
+        # Clean up audio file
+        if os.path.exists(audio_path):
+            os.remove(audio_path)
+
+        # Return both full text and segments with timestamps
+        return {
+            'text': transcript.text,
+            'segments': transcript.segments if hasattr(transcript, 'segments') else []
+        }
+
+    except Exception as e:
+        # Clean up on error
+        if os.path.exists(audio_path):
+            os.remove(audio_path)
+        raise e
 
 from moviepy.video.VideoClip import TextClip
 from moviepy.video.compositing.CompositeVideoClip import CompositeVideoClip
