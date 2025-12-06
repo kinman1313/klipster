@@ -44,7 +44,6 @@ def transcribe_video(video_path):
 
     try:
         # Use moviepy to extract audio
-        from moviepy.editor import VideoFileClip
         video = VideoFileClip(video_path)
         video.audio.write_audiofile(audio_path, codec='mp3', bitrate='64k', logger=None)
         video.close()
