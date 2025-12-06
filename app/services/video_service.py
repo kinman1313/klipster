@@ -1,14 +1,34 @@
-from pytube import YouTube
 import os
 from moviepy.video.io.VideoFileClip import VideoFileClip
 
 def download_video(url):
-    yt = YouTube(url)
-    stream = yt.streams.filter(progressive=True, file_extension='mp4').first()
+    """Download video from YouTube using yt-dlp (more reliable than pytube)."""
     if not os.path.exists('downloads'):
         os.makedirs('downloads')
-    video_path = stream.download(output_path='downloads')
-    return video_path
+
+    try:
+        # Try yt-dlp first (more reliable)
+        import yt_dlp
+
+        ydl_opts = {
+            'format': 'best[ext=mp4]/best',
+            'outtmpl': 'downloads/%(title)s.%(ext)s',
+            'quiet': True,
+            'no_warnings': True,
+        }
+
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=True)
+            video_path = ydl.prepare_filename(info)
+            return video_path
+
+    except ImportError:
+        # Fallback to pytube if yt-dlp not installed
+        from pytube import YouTube
+        yt = YouTube(url)
+        stream = yt.streams.filter(progressive=True, file_extension='mp4').first()
+        video_path = stream.download(output_path='downloads')
+        return video_path
 
 import openai
 
