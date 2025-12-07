@@ -382,11 +382,10 @@ def find_key_moments(transcription_data):
     # Check if transcript is too long (estimate ~4 chars per token)
     estimated_tokens = len(timestamped_transcript) / 4
 
-    # If too long for GPT-3.5-turbo (16k limit), use GPT-4-turbo (128k limit)
-    # or chunk the transcript
+    # If too long for GPT-3.5-turbo (16k limit), use GPT-4o (128k limit)
     if estimated_tokens > 12000:  # Leave room for system prompt and response
-        print(f"⚠️  Long transcript ({estimated_tokens:.0f} tokens), using GPT-4-turbo for larger context")
-        model = "gpt-4-turbo-preview"
+        print(f"⚠️  Long transcript ({estimated_tokens:.0f} tokens), using GPT-4o for larger context")
+        model = "gpt-4o"
     else:
         model = "gpt-3.5-turbo"
 
@@ -427,40 +426,68 @@ Timestamped Transcription:
 
 Remember: Each clip must be 30-120 seconds long. Use the exact timestamps from the transcription."""
 
-    try:
-        response = openai.chat.completions.create(
-            model=model,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt}
-            ],
-            response_format={"type": "json_object"}
-        )
+    # Try the selected model, with fallbacks
+    models_to_try = []
+    if model == "gpt-4o":
+        models_to_try = ["gpt-4o", "gpt-4-turbo", "gpt-4", "gpt-3.5-turbo"]
+    else:
+        models_to_try = ["gpt-3.5-turbo"]
 
-        return json.loads(response.choices[0].message.content)
-
-    except Exception as e:
-        if "context_length_exceeded" in str(e):
-            # Last resort: take only first 30% of segments
-            print("⚠️  Context still too long, using first 30% of video only...")
-            reduced_segments = segments[:len(segments)//3]
-            timestamped_transcript = "\n".join([
-                f"[{seg.get('start', 0):.1f}s - {seg.get('end', 0):.1f}s]: {seg.get('text', '')}"
-                for seg in reduced_segments
-            ])
-
+    last_error = None
+    for attempt_model in models_to_try:
+        try:
+            print(f"🤖 Trying model: {attempt_model}")
             response = openai.chat.completions.create(
-                model="gpt-3.5-turbo",
+                model=attempt_model,
                 messages=[
                     {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt.replace(timestamped_transcript, timestamped_transcript)}
+                    {"role": "user", "content": user_prompt}
                 ],
                 response_format={"type": "json_object"}
             )
 
+            print(f"✅ Successfully used model: {attempt_model}")
             return json.loads(response.choices[0].message.content)
-        else:
-            raise e
+
+        except Exception as e:
+            error_str = str(e)
+            if "model_not_found" in error_str or "does not exist" in error_str:
+                print(f"⚠️  Model {attempt_model} not available, trying next...")
+                last_error = e
+                continue
+            elif "context_length_exceeded" in error_str:
+                print(f"⚠️  Context too long for {attempt_model}, trying next...")
+                last_error = e
+                continue
+            else:
+                # Other error, raise it
+                raise e
+
+    # If we get here, all models failed - try chunking approach
+    print("⚠️  All models failed, using chunked approach with first 30% of video...")
+    reduced_segments = segments[:len(segments)//3]
+    timestamped_transcript = "\n".join([
+        f"[{seg.get('start', 0):.1f}s - {seg.get('end', 0):.1f}s]: {seg.get('text', '')}"
+        for seg in reduced_segments
+    ])
+
+    user_prompt_chunked = f"""Analyze this timestamped transcription and identify 3-5 key moments suitable for social media clips.
+
+Timestamped Transcription:
+{timestamped_transcript}
+
+Remember: Each clip must be 30-120 seconds long. Use the exact timestamps from the transcription."""
+
+    response = openai.chat.completions.create(
+        model="gpt-3.5-turbo",
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt_chunked}
+        ],
+        response_format={"type": "json_object"}
+    )
+
+    return json.loads(response.choices[0].message.content)
 
 def apply_effects(clip, effects_str):
     """
