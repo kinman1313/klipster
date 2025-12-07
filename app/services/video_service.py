@@ -636,71 +636,57 @@ def generate_clips(video_path, transcription_data, subtitle_color='white', emoji
         subtitle = None
         errors = []
 
-        # Approach 1: Font as first arg, text as keyword, font_size
-        try:
-            subtitle = TextClip(
-                'Arial',
-                text=subtitle_text,
-                font_size=24,
-                color=subtitle_color,
-                size=(video_clip.w - 100, None),
-                method='caption'
-            )
-        except Exception as e:
-            errors.append(f"Approach 1: {e}")
+        # Try multiple font options (Windows needs full paths, Linux/Mac can use names)
+        fonts_to_try = [
+            r'C:\Windows\Fonts\arial.ttf',     # Windows Arial path
+            r'C:\Windows\Fonts\verdana.ttf',   # Windows Verdana path
+            r'C:\Windows\Fonts\calibri.ttf',   # Windows Calibri path
+            'Arial',                            # Linux/Mac font name
+            'Verdana',                          # Alternative
+            'DejaVu-Sans',                      # Common on Linux
+        ]
 
-        # Approach 2: text keyword, font keyword, font_size (no positional)
-        if subtitle is None:
+        # Approach 1: Font as first arg, text as keyword, font_size
+        for font in fonts_to_try:
+            if subtitle is not None:
+                break
             try:
                 subtitle = TextClip(
+                    font,
                     text=subtitle_text,
-                    font='Arial',
                     font_size=24,
                     color=subtitle_color,
                     size=(video_clip.w - 100, None),
                     method='caption'
                 )
+                print(f"✅ Using font: {font}")
+                break
             except Exception as e:
-                errors.append(f"Approach 2: {e}")
+                errors.append(f"Approach 1 with {font}: {e}")
+                continue
 
-        # Approach 3: Older style - text as first positional
+        # Approach 2: text keyword, font keyword, font_size (no positional)
         if subtitle is None:
-            try:
-                subtitle = TextClip(
-                    subtitle_text,
-                    font='Arial',
-                    fontsize=24,
-                    color=subtitle_color
-                )
-            except Exception as e:
-                errors.append(f"Approach 3: {e}")
-
-        # Approach 4: text keyword with fontsize
-        if subtitle is None:
-            try:
-                subtitle = TextClip(
-                    text=subtitle_text,
-                    font='Arial',
-                    fontsize=24,
-                    color=subtitle_color
-                )
-            except Exception as e:
-                errors.append(f"Approach 4: {e}")
-
-        # Approach 5: Font first positional, text keyword, no size/method
-        if subtitle is None:
-            try:
-                subtitle = TextClip(
-                    'Arial',
-                    text=subtitle_text,
-                    font_size=24,
-                    color=subtitle_color
-                )
-            except Exception as e:
-                errors.append(f"Approach 5: {e}")
+            for font in fonts_to_try:
+                if subtitle is not None:
+                    break
+                try:
+                    subtitle = TextClip(
+                        text=subtitle_text,
+                        font=font,
+                        font_size=24,
+                        color=subtitle_color,
+                        size=(video_clip.w - 100, None),
+                        method='caption'
+                    )
+                    print(f"✅ Using font: {font}")
+                    break
+                except Exception as e:
+                    errors.append(f"Approach 2 with {font}: {e}")
+                    continue
 
         if subtitle is None:
-            raise RuntimeError(f"Failed to create TextClip with all approaches. Errors: {errors}")
+            raise RuntimeError(f"Failed to create TextClip with all font options. Errors: {errors[:5]}")
 
         subtitle = subtitle.set_pos(('center', 'bottom')).set_duration(clip_duration)
 
