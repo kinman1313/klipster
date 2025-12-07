@@ -632,38 +632,65 @@ def generate_clips(video_path, transcription_data, subtitle_color='white', emoji
             subtitle_text = f"{emojis} {subtitle_text}"
 
         # Create a text clip for subtitles
-        # Try different parameter names for different MoviePy versions
+        # MoviePy API varies significantly between versions - try multiple approaches
+        subtitle = None
+        errors = []
+
+        # Approach 1: Positional text with font and font_size
         try:
-            # Try newer API with txt parameter and font_size
             subtitle = TextClip(
-                txt=subtitle_text,
+                subtitle_text,
                 font='Arial',
                 font_size=24,
                 color=subtitle_color,
-                bg_color='black',
                 size=(video_clip.w - 100, None),
                 method='caption'
             )
-        except (TypeError, AttributeError):
+        except Exception as e:
+            errors.append(f"Approach 1: {e}")
+
+        # Approach 2: Positional text with font and fontsize
+        if subtitle is None:
             try:
-                # Try older API with fontsize
                 subtitle = TextClip(
-                    txt=subtitle_text,
+                    subtitle_text,
                     font='Arial',
                     fontsize=24,
                     color=subtitle_color,
-                    bg_color='black',
                     size=(video_clip.w - 100, None),
                     method='caption'
                 )
-            except (TypeError, AttributeError):
-                # Fallback: simplest version without bg_color
+            except Exception as e:
+                errors.append(f"Approach 2: {e}")
+
+        # Approach 3: txt keyword with fontsize
+        if subtitle is None:
+            try:
                 subtitle = TextClip(
                     txt=subtitle_text,
                     font='Arial',
                     fontsize=24,
                     color=subtitle_color
                 )
+            except Exception as e:
+                errors.append(f"Approach 3: {e}")
+
+        # Approach 4: Minimal - just positional text and font
+        if subtitle is None:
+            try:
+                subtitle = TextClip(subtitle_text, font='Arial', fontsize=24, color=subtitle_color)
+            except Exception as e:
+                errors.append(f"Approach 4: {e}")
+
+        # Approach 5: text keyword parameter
+        if subtitle is None:
+            try:
+                subtitle = TextClip(text=subtitle_text, font='Arial', fontsize=24, color=subtitle_color)
+            except Exception as e:
+                errors.append(f"Approach 5: {e}")
+
+        if subtitle is None:
+            raise RuntimeError(f"Failed to create TextClip with all approaches. Errors: {errors}")
 
         subtitle = subtitle.set_pos(('center', 'bottom')).set_duration(clip_duration)
 
