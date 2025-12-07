@@ -1,5 +1,5 @@
 from flask import Flask, request, jsonify, render_template
-from app.services.video_service import download_video, generate_clips, transcribe_video
+from app.services.video_service import download_video, generate_clips, get_transcription_optimized
 from app.services.scheduler_service import schedule_upload
 from app.models import db, User, Clip
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
@@ -63,12 +63,29 @@ def create_app():
             return jsonify({'error': 'URL is required'}), 400
 
         try:
+            # OPTIMIZED WORKFLOW:
+            # 1. Get transcription (tries captions first, then audio-only)
+            print("=" * 60)
+            print("🚀 OPTIMIZED WORKFLOW STARTING")
+            print("=" * 60)
+
+            transcription_data = get_transcription_optimized(youtube_url)
+
+            print(f"📝 Transcription method: {transcription_data.get('method', 'unknown')}")
+            print(f"📊 Transcript length: {len(transcription_data.get('text', ''))} characters")
+            print(f"⏱️  Segments: {len(transcription_data.get('segments', []))}")
+
+            # 2. Now download full video (we know what clips we need)
+            print("📥 Downloading full video for clip generation...")
             video_path = download_video(youtube_url)
-            transcription_data = transcribe_video(video_path)
+
+            # 3. Generate clips with the transcription
+            print("✂️  Generating clips from key moments...")
             clip_paths = generate_clips(video_path, transcription_data, subtitle_color, emojis, effects)
 
             # Extract full text for storage in database
             full_transcription = transcription_data.get('text', '')
+            transcription_method = transcription_data.get('method', 'unknown')
 
             # Save to database only if user is logged in
             if current_user.is_authenticated:
@@ -77,20 +94,26 @@ def create_app():
                     db.session.add(new_clip)
                 db.session.commit()
 
+            print("=" * 60)
+            print(f"✅ SUCCESS! Generated {len(clip_paths)} clips")
+            print("=" * 60)
+
             if schedule_interval and schedule_unit:
                 schedule_upload(lambda: upload_task(clip_paths), schedule_interval, schedule_unit)
                 return jsonify({
                     'message': 'Clip generation and scheduling successful',
                     'paths': clip_paths,
                     'transcription': full_transcription,
-                    'clips_generated': len(clip_paths)
+                    'clips_generated': len(clip_paths),
+                    'transcription_method': transcription_method
                 })
 
             return jsonify({
                 'message': 'Clip generated successfully',
                 'paths': clip_paths,
                 'transcription': full_transcription,
-                'clips_generated': len(clip_paths)
+                'clips_generated': len(clip_paths),
+                'transcription_method': transcription_method
             })
         except Exception as e:
             return jsonify({'error': str(e)}), 500

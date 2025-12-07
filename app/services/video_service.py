@@ -1,8 +1,130 @@
 import os
 from moviepy.video.io.VideoFileClip import VideoFileClip
 
+def get_youtube_captions(url):
+    """
+    Try to fetch YouTube captions/subtitles (instant, no download needed).
+
+    Returns:
+        dict: {'text': full_text, 'segments': [{'start': float, 'end': float, 'text': str}]}
+        or None if no captions available
+    """
+    try:
+        import yt_dlp
+
+        ydl_opts = {
+            'skip_download': True,
+            'writesubtitles': True,
+            'writeautomaticsub': True,
+            'subtitleslangs': ['en'],
+            'quiet': True,
+            'no_warnings': True,
+        }
+
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=False)
+
+            # Check for captions
+            subtitles = info.get('subtitles', {})
+            automatic_captions = info.get('automatic_captions', {})
+
+            # Prefer manual subtitles, fall back to auto-generated
+            captions_data = subtitles.get('en') or automatic_captions.get('en')
+
+            if not captions_data:
+                return None
+
+            # Find JSON format captions (has timestamps)
+            json_caption = None
+            for caption in captions_data:
+                if caption.get('ext') == 'json3':
+                    json_caption = caption
+                    break
+
+            if not json_caption:
+                return None
+
+            # Download and parse the captions
+            import urllib.request
+            import json
+
+            with urllib.request.urlopen(json_caption['url']) as response:
+                caption_data = json.loads(response.read().decode('utf-8'))
+
+            # Parse caption segments
+            segments = []
+            full_text_parts = []
+
+            for event in caption_data.get('events', []):
+                if 'segs' not in event:
+                    continue
+
+                start_time = event.get('tStartMs', 0) / 1000.0  # Convert to seconds
+                duration = event.get('dDurationMs', 0) / 1000.0
+                end_time = start_time + duration
+
+                # Combine all text segments in this event
+                text_parts = [seg.get('utf8', '') for seg in event.get('segs', [])]
+                text = ''.join(text_parts).strip()
+
+                if text:
+                    segments.append({
+                        'start': start_time,
+                        'end': end_time,
+                        'text': text
+                    })
+                    full_text_parts.append(text)
+
+            print(f"✅ Found YouTube captions! {len(segments)} segments")
+            return {
+                'text': ' '.join(full_text_parts),
+                'segments': segments
+            }
+
+    except Exception as e:
+        print(f"Could not fetch captions: {e}")
+        return None
+
+def download_audio_only(url):
+    """
+    Download only the audio track from YouTube (much faster and smaller than full video).
+
+    Returns:
+        str: Path to the downloaded audio file
+    """
+    if not os.path.exists('downloads'):
+        os.makedirs('downloads')
+
+    try:
+        import yt_dlp
+
+        ydl_opts = {
+            'format': 'bestaudio/best',
+            'outtmpl': 'downloads/%(title)s_audio.%(ext)s',
+            'postprocessors': [{
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': 'mp3',
+                'preferredquality': '64',
+            }],
+            'quiet': True,
+            'no_warnings': True,
+        }
+
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=True)
+            # yt-dlp changes extension to mp3 after conversion
+            base_path = ydl.prepare_filename(info)
+            audio_path = base_path.rsplit('.', 1)[0] + '.mp3'
+            print(f"✅ Downloaded audio only: {os.path.basename(audio_path)}")
+            return audio_path
+
+    except ImportError:
+        # Fallback: download full video and extract audio
+        print("yt-dlp not available, downloading full video...")
+        return None
+
 def download_video(url):
-    """Download video from YouTube using yt-dlp (more reliable than pytube)."""
+    """Download full video from YouTube using yt-dlp (more reliable than pytube)."""
     if not os.path.exists('downloads'):
         os.makedirs('downloads')
 
@@ -20,6 +142,7 @@ def download_video(url):
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
             video_path = ydl.prepare_filename(info)
+            print(f"✅ Downloaded video: {os.path.basename(video_path)}")
             return video_path
 
     except ImportError:
@@ -31,6 +154,123 @@ def download_video(url):
         return video_path
 
 import openai
+
+def get_transcription_optimized(url):
+    """
+    OPTIMIZED: Get transcription using the fastest available method.
+
+    Workflow:
+    1. Try YouTube captions first (instant, free!)
+    2. If no captions: Download audio only (much smaller/faster)
+    3. Transcribe audio with Whisper
+    4. Return transcription data
+
+    Returns:
+        dict: {'text': full_text, 'segments': timestamped_segments, 'method': str}
+    """
+    print("🔍 Trying to fetch YouTube captions...")
+
+    # Step 1: Try captions first (instant!)
+    captions = get_youtube_captions(url)
+    if captions:
+        print("⚡ Using YouTube captions (instant, no transcription needed!)")
+        captions['method'] = 'youtube_captions'
+        return captions
+
+    print("⚠️  No captions available, downloading audio...")
+
+    # Step 2: Download audio only (much faster than full video)
+    audio_path = download_audio_only(url)
+
+    if not audio_path:
+        # Fallback: download full video
+        print("⚠️  Downloading full video as fallback...")
+        video_path = download_video(url)
+        audio_path = video_path
+
+    # Step 3: Transcribe audio with Whisper
+    print("🎤 Transcribing audio with Whisper...")
+    transcription = transcribe_audio_file(audio_path)
+    transcription['method'] = 'whisper_transcription'
+
+    # Clean up audio file if it was audio-only download
+    if audio_path.endswith('_audio.mp3') and os.path.exists(audio_path):
+        os.remove(audio_path)
+        print(f"🧹 Cleaned up temporary audio file")
+
+    return transcription
+
+def transcribe_audio_file(audio_path):
+    """
+    Transcribe an audio or video file using Whisper.
+    Handles compression if file is too large.
+
+    Returns:
+        dict: {'text': full_text, 'segments': timestamped_segments}
+    """
+    # Check if we need to extract/compress audio from video
+    is_video = audio_path.endswith('.mp4') or audio_path.endswith('.mkv') or audio_path.endswith('.avi')
+
+    if is_video:
+        # Extract audio from video
+        temp_audio_path = audio_path.rsplit('.', 1)[0] + '_audio.mp3'
+        video = VideoFileClip(audio_path)
+        video.audio.write_audiofile(temp_audio_path, codec='mp3', bitrate='64k', logger=None)
+        video.close()
+        audio_to_transcribe = temp_audio_path
+    else:
+        audio_to_transcribe = audio_path
+        temp_audio_path = None
+
+    try:
+        # Check file size (Whisper has 25MB limit)
+        audio_size_mb = os.path.getsize(audio_to_transcribe) / (1024 * 1024)
+        print(f"📊 Audio file size: {audio_size_mb:.2f} MB")
+
+        if audio_size_mb > 24:
+            # Re-encode with lower bitrate if too large
+            print("⚠️  Audio too large, re-encoding with lower bitrate...")
+            compressed_path = audio_to_transcribe.replace('.mp3', '_compressed.mp3')
+
+            if is_video:
+                video = VideoFileClip(audio_path)
+                video.audio.write_audiofile(compressed_path, codec='mp3', bitrate='32k', logger=None)
+                video.close()
+            else:
+                # Use ffmpeg to compress existing audio
+                import subprocess
+                subprocess.run(['ffmpeg', '-i', audio_to_transcribe, '-b:a', '32k', compressed_path, '-y'],
+                             capture_output=True)
+
+            if temp_audio_path and os.path.exists(temp_audio_path):
+                os.remove(temp_audio_path)
+            audio_to_transcribe = compressed_path
+            temp_audio_path = compressed_path
+
+        # Transcribe using Whisper
+        with open(audio_to_transcribe, "rb") as audio_file:
+            transcript = openai.audio.transcriptions.create(
+                model="whisper-1",
+                file=audio_file,
+                response_format="verbose_json",
+                timestamp_granularities=["segment"]
+            )
+
+        # Clean up temporary audio file
+        if temp_audio_path and os.path.exists(temp_audio_path):
+            os.remove(temp_audio_path)
+
+        # Return both full text and segments with timestamps
+        return {
+            'text': transcript.text,
+            'segments': transcript.segments if hasattr(transcript, 'segments') else []
+        }
+
+    except Exception as e:
+        # Clean up on error
+        if temp_audio_path and os.path.exists(temp_audio_path):
+            os.remove(temp_audio_path)
+        raise e
 
 def transcribe_video(video_path):
     """
