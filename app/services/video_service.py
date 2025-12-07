@@ -632,7 +632,16 @@ def generate_clips(video_path, transcription_data, subtitle_color='white', emoji
             subtitle_text = f"{emojis} {subtitle_text}"
 
         # Create a text clip for subtitles
-        subtitle = TextClip(subtitle_text, fontsize=24, color=subtitle_color, bg_color='black')
+        # Try different parameter names for different MoviePy versions
+        try:
+            subtitle = TextClip(subtitle_text, font_size=24, color=subtitle_color, bg_color='black')
+        except TypeError:
+            try:
+                subtitle = TextClip(subtitle_text, fontsize=24, color=subtitle_color, bg_color='black')
+            except TypeError:
+                # Fallback: minimal parameters
+                subtitle = TextClip(subtitle_text, font='Arial', fontsize=24, color=subtitle_color)
+
         subtitle = subtitle.set_pos(('center', 'bottom')).set_duration(clip_duration)
 
         # Create the subclip
