@@ -636,11 +636,11 @@ def generate_clips(video_path, transcription_data, subtitle_color='white', emoji
         subtitle = None
         errors = []
 
-        # Approach 1: Positional text with font and font_size
+        # Approach 1: Font as first arg, text as keyword, font_size
         try:
             subtitle = TextClip(
-                subtitle_text,
-                font='Arial',
+                'Arial',
+                text=subtitle_text,
                 font_size=24,
                 color=subtitle_color,
                 size=(video_clip.w - 100, None),
@@ -649,13 +649,13 @@ def generate_clips(video_path, transcription_data, subtitle_color='white', emoji
         except Exception as e:
             errors.append(f"Approach 1: {e}")
 
-        # Approach 2: Positional text with font and fontsize
+        # Approach 2: text keyword, font keyword, font_size (no positional)
         if subtitle is None:
             try:
                 subtitle = TextClip(
-                    subtitle_text,
+                    text=subtitle_text,
                     font='Arial',
-                    fontsize=24,
+                    font_size=24,
                     color=subtitle_color,
                     size=(video_clip.w - 100, None),
                     method='caption'
@@ -663,11 +663,11 @@ def generate_clips(video_path, transcription_data, subtitle_color='white', emoji
             except Exception as e:
                 errors.append(f"Approach 2: {e}")
 
-        # Approach 3: txt keyword with fontsize
+        # Approach 3: Older style - text as first positional
         if subtitle is None:
             try:
                 subtitle = TextClip(
-                    txt=subtitle_text,
+                    subtitle_text,
                     font='Arial',
                     fontsize=24,
                     color=subtitle_color
@@ -675,17 +675,27 @@ def generate_clips(video_path, transcription_data, subtitle_color='white', emoji
             except Exception as e:
                 errors.append(f"Approach 3: {e}")
 
-        # Approach 4: Minimal - just positional text and font
+        # Approach 4: text keyword with fontsize
         if subtitle is None:
             try:
-                subtitle = TextClip(subtitle_text, font='Arial', fontsize=24, color=subtitle_color)
+                subtitle = TextClip(
+                    text=subtitle_text,
+                    font='Arial',
+                    fontsize=24,
+                    color=subtitle_color
+                )
             except Exception as e:
                 errors.append(f"Approach 4: {e}")
 
-        # Approach 5: text keyword parameter
+        # Approach 5: Font first positional, text keyword, no size/method
         if subtitle is None:
             try:
-                subtitle = TextClip(text=subtitle_text, font='Arial', fontsize=24, color=subtitle_color)
+                subtitle = TextClip(
+                    'Arial',
+                    text=subtitle_text,
+                    font_size=24,
+                    color=subtitle_color
+                )
             except Exception as e:
                 errors.append(f"Approach 5: {e}")
 
