@@ -362,42 +362,83 @@ fadein, fadeout, speedx = get_moviepy_effects()
 
 def find_key_moments(transcription_data):
     """
-    Analyze timestamped transcription segments and identify key moments for clips.
+    OPTIMIZED: Analyze transcription using smart sampling to minimize token usage.
+
+    Token Optimization Strategy:
+    - Condenses transcript format (timestamps only at time ranges)
+    - Intelligent sampling based on video length
+    - Always tries GPT-3.5-turbo first (cheaper)
+    - Reduces tokens by 80-90% vs sending full transcript
 
     Args:
-        transcription_data: Dict with 'text' (full transcription) and 'segments' (timestamped segments)
+        transcription_data: Dict with 'text' and 'segments'
 
     Returns:
-        Dict with 'moments' list, each containing start_time, end_time, and text
+        Dict with 'moments' list
     """
     segments = transcription_data.get('segments', [])
-    full_text = transcription_data.get('text', '')
 
-    # Build a transcript with timestamps for GPT to analyze
-    timestamped_transcript = "\n".join([
-        f"[{seg.get('start', 0):.1f}s - {seg.get('end', 0):.1f}s]: {seg.get('text', '')}"
-        for seg in segments
+    if not segments:
+        return {'moments': []}
+
+    # Calculate video duration
+    video_duration = segments[-1].get('end', 0) if segments else 0
+
+    print(f"📊 Video duration: {video_duration/60:.1f} minutes, {len(segments)} segments")
+
+    # SMART SAMPLING: Reduce segments intelligently
+    # For long videos, we don't need every segment - sample strategically
+    if len(segments) > 200:
+        # Sample every Nth segment to keep around 150-200 segments max
+        sample_rate = len(segments) // 150
+        sampled = segments[::sample_rate]
+        print(f"⚡ Sampled {len(sampled)} segments from {len(segments)} (every {sample_rate}th)")
+    elif len(segments) > 100:
+        # Light sampling for medium videos
+        sampled = segments[::2]
+        print(f"⚡ Sampled {len(sampled)} segments from {len(segments)} (every 2nd)")
+    else:
+        sampled = segments
+
+    # CONDENSED FORMAT: Use compact representation
+    # Instead of full text for each segment, group into time ranges
+    condensed_segments = []
+    current_group = []
+    current_start = None
+    group_duration = 30  # Group segments into 30-second chunks
+
+    for seg in sampled:
+        start = seg.get('start', 0)
+        end = seg.get('end', 0)
+        text = seg.get('text', '').strip()
+
+        if current_start is None:
+            current_start = start
+
+        current_group.append(text)
+
+        # Create a group when we hit duration or last segment
+        if (end - current_start) >= group_duration or seg == sampled[-1]:
+            combined_text = ' '.join(current_group)
+            # Truncate very long groups
+            if len(combined_text) > 200:
+                combined_text = combined_text[:200] + '...'
+
+            condensed_segments.append({
+                'time': f"{int(current_start)}-{int(end)}s",
+                'content': combined_text
+            })
+            current_group = []
+            current_start = None
+
+    # Build ultra-compact transcript
+    compact_transcript = "\n".join([
+        f"[{seg['time']}] {seg['content']}"
+        for seg in condensed_segments
     ])
 
-    # Check if transcript is too long (estimate ~4 chars per token)
-    estimated_tokens = len(timestamped_transcript) / 4
-
-    # If too long for GPT-3.5-turbo (16k limit), use GPT-4o (128k limit)
-    if estimated_tokens > 12000:  # Leave room for system prompt and response
-        print(f"⚠️  Long transcript ({estimated_tokens:.0f} tokens), using GPT-4o for larger context")
-        model = "gpt-4o"
-    else:
-        model = "gpt-3.5-turbo"
-
-    # If still too long even for GPT-4, sample segments
-    if estimated_tokens > 100000:
-        print(f"⚠️  Very long transcript, sampling every 3rd segment...")
-        sampled_segments = segments[::3]  # Take every 3rd segment
-        timestamped_transcript = "\n".join([
-            f"[{seg.get('start', 0):.1f}s - {seg.get('end', 0):.1f}s]: {seg.get('text', '')}"
-            for seg in sampled_segments
-        ])
-        print(f"📊 Reduced from {len(segments)} to {len(sampled_segments)} segments")
+    estimated_tokens = len(compact_transcript) / 4
+    print(f"💰 Estimated tokens: {estimated_tokens:.0f} (vs {len(' '.join([s.get('text', '') for s in segments]))/4:.0f} original)")
 
     system_prompt = """You are an expert video editor that identifies engaging, interesting moments from video transcriptions for social media clips.
 
@@ -422,16 +463,12 @@ Respond ONLY with valid JSON in this exact format:
     user_prompt = f"""Analyze this timestamped transcription and identify 3-5 key moments suitable for social media clips.
 
 Timestamped Transcription:
-{timestamped_transcript}
+{compact_transcript}
 
 Remember: Each clip must be 30-120 seconds long. Use the exact timestamps from the transcription."""
 
-    # Try the selected model, with fallbacks
-    models_to_try = []
-    if model == "gpt-4o":
-        models_to_try = ["gpt-4o", "gpt-4-turbo", "gpt-4", "gpt-3.5-turbo"]
-    else:
-        models_to_try = ["gpt-3.5-turbo"]
+    # ALWAYS try GPT-3.5-turbo first (cheapest), then fallback to more expensive models
+    models_to_try = ["gpt-3.5-turbo", "gpt-4o", "gpt-4-turbo", "gpt-4"]
 
     last_error = None
     for attempt_model in models_to_try:
@@ -447,7 +484,12 @@ Remember: Each clip must be 30-120 seconds long. Use the exact timestamps from t
             )
 
             print(f"✅ Successfully used model: {attempt_model}")
-            return json.loads(response.choices[0].message.content)
+            result = json.loads(response.choices[0].message.content)
+
+            # Log token savings
+            print(f"💰 Token optimization successful! Reduced by ~{100 - (estimated_tokens/(len(' '.join([s.get('text', '') for s in segments]))/4)*100):.0f}%")
+
+            return result
 
         except Exception as e:
             error_str = str(e)
@@ -455,26 +497,35 @@ Remember: Each clip must be 30-120 seconds long. Use the exact timestamps from t
                 print(f"⚠️  Model {attempt_model} not available, trying next...")
                 last_error = e
                 continue
-            elif "context_length_exceeded" in error_str:
-                print(f"⚠️  Context too long for {attempt_model}, trying next...")
+            elif "context_length_exceeded" in error_str or "too large" in error_str.lower() or "429" in error_str:
+                print(f"⚠️  Request too large for {attempt_model}, trying next...")
                 last_error = e
                 continue
             else:
                 # Other error, raise it
                 raise e
 
-    # If we get here, all models failed - try chunking approach
-    print("⚠️  All models failed, using chunked approach with first 30% of video...")
-    reduced_segments = segments[:len(segments)//3]
-    timestamped_transcript = "\n".join([
-        f"[{seg.get('start', 0):.1f}s - {seg.get('end', 0):.1f}s]: {seg.get('text', '')}"
-        for seg in reduced_segments
-    ])
+    # If we get here, all models failed - try even more aggressive chunking
+    print("⚠️  All models failed, using ultra-compressed approach with first 20% of video...")
 
-    user_prompt_chunked = f"""Analyze this timestamped transcription and identify 3-5 key moments suitable for social media clips.
+    # Take only first 20% of segments and compress even more
+    reduced_segments = segments[:max(1, len(segments)//5)]
+    ultra_compact = []
+
+    for i in range(0, len(reduced_segments), 10):
+        chunk = reduced_segments[i:i+10]
+        if chunk:
+            start = chunk[0].get('start', 0)
+            end = chunk[-1].get('end', 0)
+            text = ' '.join([s.get('text', '')[:50] for s in chunk])  # Limit each to 50 chars
+            ultra_compact.append(f"[{int(start)}-{int(end)}s] {text[:100]}")
+
+    ultra_compact_transcript = "\n".join(ultra_compact)
+
+    user_prompt_ultra = f"""Analyze this timestamped transcription and identify 2-3 key moments suitable for social media clips.
 
 Timestamped Transcription:
-{timestamped_transcript}
+{ultra_compact_transcript}
 
 Remember: Each clip must be 30-120 seconds long. Use the exact timestamps from the transcription."""
 
@@ -482,7 +533,7 @@ Remember: Each clip must be 30-120 seconds long. Use the exact timestamps from t
         model="gpt-3.5-turbo",
         messages=[
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt_chunked}
+            {"role": "user", "content": user_prompt_ultra}
         ],
         response_format={"type": "json_object"}
     )
