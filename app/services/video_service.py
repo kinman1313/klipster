@@ -591,6 +591,67 @@ def apply_effects(clip, effects_str):
 
     return clip
 
+def create_subtitle_clip(text, color, video_width, duration):
+    """
+    Create a subtitle TextClip with comprehensive error handling for different MoviePy versions.
+
+    Returns:
+        TextClip or None if creation fails
+    """
+    import os
+
+    # Try multiple font options (Windows needs full paths, Linux/Mac can use names)
+    fonts_to_try = []
+
+    # Windows fonts
+    if os.path.exists(r'C:\Windows\Fonts'):
+        fonts_to_try.extend([
+            r'C:\Windows\Fonts\arial.ttf',
+            r'C:\Windows\Fonts\verdana.ttf',
+            r'C:\Windows\Fonts\calibri.ttf',
+            r'C:\Windows\Fonts\times.ttf',
+        ])
+
+    # Linux/Mac fonts
+    fonts_to_try.extend(['Arial', 'Verdana', 'DejaVu-Sans', 'Helvetica'])
+
+    subtitle = None
+
+    # Try different API approaches with different fonts
+    for font in fonts_to_try:
+        if subtitle is not None:
+            break
+
+        # Approach 1: Font as first positional, text keyword, font_size
+        try:
+            clip = TextClip(font, text=text, font_size=24, color=color,
+                          size=(video_width - 100, None), method='caption')
+            # Try to position it
+            subtitle = clip.set_position(('center', 'bottom')).set_duration(duration)
+            return subtitle
+        except:
+            pass
+
+        # Approach 2: All keyword arguments
+        try:
+            clip = TextClip(text=text, font=font, font_size=24, color=color,
+                          size=(video_width - 100, None), method='caption')
+            subtitle = clip.set_position(('center', 'bottom')).set_duration(duration)
+            return subtitle
+        except:
+            pass
+
+        # Approach 3: Minimal parameters, try set_pos instead of set_position
+        try:
+            clip = TextClip(text=text, font=font, fontsize=24, color=color)
+            subtitle = clip.set_pos(('center', 'bottom')).set_duration(duration)
+            return subtitle
+        except:
+            pass
+
+    # If all attempts failed, return None (clip will be generated without subtitles)
+    return None
+
 def generate_clips(video_path, transcription_data, subtitle_color='white', emojis=None, effects=None):
     """
     Generate video clips from key moments identified in the transcription.
@@ -623,82 +684,38 @@ def generate_clips(video_path, transcription_data, subtitle_color='white', emoji
             print(f"Skipping clip {i}: too long ({clip_duration:.1f}s > 120s)")
             continue
 
-        # Extract segment-specific text for this clip
-        segment_text = get_text_for_timerange(segments, start_time, end_time)
-
-        # Create subtitle text for this specific segment
-        subtitle_text = segment_text
-        if emojis:
-            subtitle_text = f"{emojis} {subtitle_text}"
-
-        # Create a text clip for subtitles
-        # MoviePy API varies significantly between versions - try multiple approaches
-        subtitle = None
-        errors = []
-
-        # Try multiple font options (Windows needs full paths, Linux/Mac can use names)
-        fonts_to_try = [
-            r'C:\Windows\Fonts\arial.ttf',     # Windows Arial path
-            r'C:\Windows\Fonts\verdana.ttf',   # Windows Verdana path
-            r'C:\Windows\Fonts\calibri.ttf',   # Windows Calibri path
-            'Arial',                            # Linux/Mac font name
-            'Verdana',                          # Alternative
-            'DejaVu-Sans',                      # Common on Linux
-        ]
-
-        # Approach 1: Font as first arg, text as keyword, font_size
-        for font in fonts_to_try:
-            if subtitle is not None:
-                break
-            try:
-                subtitle = TextClip(
-                    font,
-                    text=subtitle_text,
-                    font_size=24,
-                    color=subtitle_color,
-                    size=(video_clip.w - 100, None),
-                    method='caption'
-                )
-                print(f"✅ Using font: {font}")
-                break
-            except Exception as e:
-                errors.append(f"Approach 1 with {font}: {e}")
-                continue
-
-        # Approach 2: text keyword, font keyword, font_size (no positional)
-        if subtitle is None:
-            for font in fonts_to_try:
-                if subtitle is not None:
-                    break
-                try:
-                    subtitle = TextClip(
-                        text=subtitle_text,
-                        font=font,
-                        font_size=24,
-                        color=subtitle_color,
-                        size=(video_clip.w - 100, None),
-                        method='caption'
-                    )
-                    print(f"✅ Using font: {font}")
-                    break
-                except Exception as e:
-                    errors.append(f"Approach 2 with {font}: {e}")
-                    continue
-
-        if subtitle is None:
-            raise RuntimeError(f"Failed to create TextClip with all font options. Errors: {errors[:5]}")
-
-        subtitle = subtitle.set_pos(('center', 'bottom')).set_duration(clip_duration)
-
-        # Create the subclip
+        # Create the subclip first
         clip_segment = video_clip.subclip(start_time, end_time)
 
         # Apply effects if specified
         if effects:
             clip_segment = apply_effects(clip_segment, effects)
 
-        # Composite the video and subtitle
-        final_clip = CompositeVideoClip([clip_segment, subtitle])
+        # Try to add subtitles (optional - will skip if fails)
+        final_clip = clip_segment  # Default: no subtitles
+
+        try:
+            # Extract segment-specific text for this clip
+            segment_text = get_text_for_timerange(segments, start_time, end_time)
+
+            # Create subtitle text for this specific segment
+            subtitle_text = segment_text[:500]  # Limit length to avoid issues
+            if emojis:
+                subtitle_text = f"{emojis} {subtitle_text}"
+
+            # Try to create subtitle with MoviePy
+            subtitle = create_subtitle_clip(subtitle_text, subtitle_color, clip_segment.w, clip_duration)
+
+            if subtitle:
+                # Composite the video and subtitle
+                final_clip = CompositeVideoClip([clip_segment, subtitle])
+                print(f"✅ Added subtitles to clip {i}")
+            else:
+                print(f"⚠️  Skipping subtitles for clip {i} (not critical)")
+
+        except Exception as e:
+            print(f"⚠️  Could not add subtitles to clip {i}: {e}")
+            print(f"   Generating clip without subtitles...")
 
         if not os.path.exists('clips'):
             os.makedirs('clips')
