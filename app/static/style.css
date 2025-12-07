@@ -1,34 +1,351 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
 body {
-    font-family: sans-serif;
-    margin: 2em;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    padding: 2em;
+}
+
+.container {
+    max-width: 700px;
+    margin: 0 auto;
+    background: white;
+    border-radius: 20px;
+    padding: 2.5em;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
 }
 
 h1 {
     text-align: center;
+    color: #333;
+    margin-bottom: 0.5em;
+    font-size: 2.5em;
 }
 
-form {
+.subtitle {
+    text-align: center;
+    color: #666;
+    margin-bottom: 2em;
+    font-size: 1.1em;
+}
+
+.form-group {
+    margin-bottom: 1.5em;
+}
+
+.form-group label {
+    display: block;
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 0.5em;
+}
+
+.required {
+    color: #e74c3c;
+}
+
+.help-text {
+    font-weight: normal;
+    color: #999;
+    font-size: 0.9em;
+}
+
+input[type="text"],
+input[type="number"],
+select {
+    width: 100%;
+    padding: 0.75em;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 1em;
+    transition: border-color 0.3s;
+}
+
+input[type="text"]:focus,
+input[type="number"]:focus,
+select:focus {
+    outline: none;
+    border-color: #667eea;
+}
+
+/* Color picker */
+.color-options {
     display: flex;
-    flex-direction: column;
-    width: 50%;
-    margin: 0 auto;
+    align-items: center;
+    gap: 1em;
 }
 
-label {
-    margin-top: 1em;
-}
-
-input, button {
-    padding: 0.5em;
-    margin-top: 0.5em;
-}
-
-button {
-    margin-top: 1em;
+input[type="color"] {
+    width: 60px;
+    height: 40px;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
     cursor: pointer;
 }
 
-#response {
+.preset-colors {
+    display: flex;
+    gap: 0.5em;
+}
+
+.color-preset {
+    width: 35px;
+    height: 35px;
+    border: 2px solid #ddd;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+    font-size: 1.2em;
+}
+
+.color-preset:hover {
+    transform: scale(1.1);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+/* Emoji picker */
+.emoji-picker {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75em;
+}
+
+.emoji-options {
+    display: flex;
+    gap: 0.5em;
+    flex-wrap: wrap;
+}
+
+.emoji-btn {
+    width: 45px;
+    height: 45px;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    background: white;
+    font-size: 1.5em;
+    cursor: pointer;
+    transition: transform 0.2s, background-color 0.2s;
+}
+
+.emoji-btn:hover {
+    transform: scale(1.1);
+    background-color: #f0f0f0;
+}
+
+/* Effects */
+.effect-option {
+    display: flex;
+    align-items: center;
+    gap: 1em;
+    padding: 0.75em;
+    background: #f8f9fa;
+    border-radius: 8px;
+    margin-bottom: 0.75em;
+}
+
+.effect-option input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+}
+
+.effect-option label {
+    flex: 1;
+    margin: 0;
+    font-weight: 500;
+}
+
+.effect-option select {
+    flex: 0 0 180px;
+    padding: 0.5em;
+}
+
+.effect-option select:disabled {
+    background: #e9ecef;
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+/* Schedule */
+.schedule-options {
+    display: flex;
+    gap: 1em;
+}
+
+.schedule-options input {
+    flex: 1;
+}
+
+.schedule-options select {
+    flex: 1;
+}
+
+/* Submit button */
+.submit-btn {
+    width: 100%;
+    padding: 1em;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-size: 1.1em;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+    margin-top: 1em;
+}
+
+.submit-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
+}
+
+.submit-btn:active {
+    transform: translateY(0);
+}
+
+/* Progress indicator */
+#progress {
     margin-top: 2em;
     text-align: center;
+}
+
+.progress-bar {
+    width: 100%;
+    height: 8px;
+    background: #e0e0e0;
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 1em;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #667eea, #764ba2);
+    animation: progress 2s ease-in-out infinite;
+}
+
+@keyframes progress {
+    0% { width: 0%; }
+    50% { width: 70%; }
+    100% { width: 100%; }
+}
+
+.progress-text {
+    color: #666;
+    font-weight: 500;
+}
+
+/* Response messages */
+#response {
+    margin-top: 2em;
+}
+
+.success-message,
+.error-message {
+    padding: 1.5em;
+    border-radius: 10px;
+    animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.success-message {
+    background: #d4edda;
+    border: 2px solid #28a745;
+}
+
+.success-message h2 {
+    color: #155724;
+    margin-bottom: 1em;
+}
+
+.error-message {
+    background: #f8d7da;
+    border: 2px solid #dc3545;
+}
+
+.error-message h2 {
+    color: #721c24;
+    margin-bottom: 1em;
+}
+
+.result-section {
+    margin-top: 1.5em;
+    padding: 1em;
+    background: white;
+    border-radius: 8px;
+}
+
+.result-section h3 {
+    color: #333;
+    margin-bottom: 0.75em;
+    font-size: 1.1em;
+}
+
+.result-section ul {
+    list-style: none;
+    padding-left: 0;
+}
+
+.result-section li {
+    padding: 0.5em 0;
+    border-bottom: 1px solid #e0e0e0;
+    color: #555;
+    word-break: break-all;
+}
+
+.result-section li:last-child {
+    border-bottom: none;
+}
+
+.transcription-text {
+    color: #555;
+    line-height: 1.6;
+    max-height: 150px;
+    overflow-y: auto;
+    padding: 0.75em;
+    background: #f8f9fa;
+    border-radius: 6px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    body {
+        padding: 1em;
+    }
+
+    .container {
+        padding: 1.5em;
+    }
+
+    h1 {
+        font-size: 2em;
+    }
+
+    .schedule-options {
+        flex-direction: column;
+    }
+
+    .effect-option {
+        flex-wrap: wrap;
+    }
+
+    .effect-option select {
+        flex: 1 1 100%;
+    }
 }

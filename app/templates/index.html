@@ -3,30 +3,122 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Video Clipper</title>
+    <title>Klipster - AI Video Clipper</title>
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-    <h1>AI Video Clipper</h1>
-    <form id="clip-form">
-        <label for="youtube-url">YouTube URL:</label>
-        <input type="text" id="youtube-url" name="youtube-url" required>
-        <label for="subtitle-color">Subtitle Color:</label>
-        <input type="color" id="subtitle-color" name="subtitle-color" value="#FFFFFF">
-        <label for="emojis">Emojis:</label>
-        <input type="text" id="emojis" name="emojis">
-        <label for="effects">Effects:</label>
-        <input type="text" id="effects" name="effects">
-        <label for="schedule-interval">Schedule Interval:</label>
-        <input type="number" id="schedule-interval" name="schedule-interval">
-        <label for="schedule-unit">Schedule Unit:</label>
-        <select id="schedule-unit" name="schedule-unit">
-            <option value="minutes">Minutes</option>
-            <option value="hours">Hours</option>
-        </select>
-        <button type="submit">Generate Clip</button>
-    </form>
-    <div id="response"></div>
+    <div class="container">
+        <h1>🎬 Klipster - AI Video Clipper</h1>
+        <p class="subtitle">Generate engaging 30s-2min clips from YouTube videos using AI</p>
+
+        <form id="clip-form">
+            <!-- YouTube URL -->
+            <div class="form-group">
+                <label for="youtube-url">YouTube URL: <span class="required">*</span></label>
+                <input type="text" id="youtube-url" name="youtube-url" placeholder="https://www.youtube.com/watch?v=..." required>
+            </div>
+
+            <!-- Subtitle Options -->
+            <div class="form-group">
+                <label for="subtitle-color">Subtitle Color:</label>
+                <div class="color-options">
+                    <input type="color" id="subtitle-color" name="subtitle-color" value="#FFFFFF">
+                    <div class="preset-colors">
+                        <button type="button" class="color-preset" data-color="#FFFFFF" style="background: #FFFFFF;" title="White">⚪</button>
+                        <button type="button" class="color-preset" data-color="#FFFF00" style="background: #FFFF00;" title="Yellow">🟡</button>
+                        <button type="button" class="color-preset" data-color="#FF0000" style="background: #FF0000;" title="Red">🔴</button>
+                        <button type="button" class="color-preset" data-color="#00FF00" style="background: #00FF00;" title="Green">🟢</button>
+                        <button type="button" class="color-preset" data-color="#00FFFF" style="background: #00FFFF;" title="Cyan">🔵</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Emoji Picker -->
+            <div class="form-group">
+                <label for="emojis">Add Emojis: <span class="help-text">(optional)</span></label>
+                <div class="emoji-picker">
+                    <input type="text" id="emojis" name="emojis" placeholder="Type or click to add emojis">
+                    <div class="emoji-options">
+                        <button type="button" class="emoji-btn" data-emoji="🔥">🔥</button>
+                        <button type="button" class="emoji-btn" data-emoji="💯">💯</button>
+                        <button type="button" class="emoji-btn" data-emoji="✨">✨</button>
+                        <button type="button" class="emoji-btn" data-emoji="🎯">🎯</button>
+                        <button type="button" class="emoji-btn" data-emoji="💪">💪</button>
+                        <button type="button" class="emoji-btn" data-emoji="🚀">🚀</button>
+                        <button type="button" class="emoji-btn" data-emoji="⚡">⚡</button>
+                        <button type="button" class="emoji-btn" data-emoji="🎬">🎬</button>
+                        <button type="button" class="emoji-btn" data-emoji="👀">👀</button>
+                        <button type="button" class="emoji-btn" data-emoji="😂">😂</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Video Effects -->
+            <div class="form-group">
+                <label>Video Effects: <span class="help-text">(optional)</span></label>
+
+                <div class="effect-option">
+                    <input type="checkbox" id="speed-effect" name="speed-effect">
+                    <label for="speed-effect">Speed Adjustment</label>
+                    <select id="speed-value" name="speed-value" disabled>
+                        <option value="0.5">0.5x (Slow Motion)</option>
+                        <option value="0.75">0.75x</option>
+                        <option value="1.0" selected>1.0x (Normal)</option>
+                        <option value="1.25">1.25x</option>
+                        <option value="1.5">1.5x (Faster)</option>
+                        <option value="2.0">2.0x (Very Fast)</option>
+                    </select>
+                </div>
+
+                <div class="effect-option">
+                    <input type="checkbox" id="fadein-effect" name="fadein-effect">
+                    <label for="fadein-effect">Fade In</label>
+                    <select id="fadein-value" name="fadein-value" disabled>
+                        <option value="0.5">0.5 seconds</option>
+                        <option value="1.0" selected>1.0 second</option>
+                        <option value="1.5">1.5 seconds</option>
+                        <option value="2.0">2.0 seconds</option>
+                    </select>
+                </div>
+
+                <div class="effect-option">
+                    <input type="checkbox" id="fadeout-effect" name="fadeout-effect">
+                    <label for="fadeout-effect">Fade Out</label>
+                    <select id="fadeout-value" name="fadeout-value" disabled>
+                        <option value="0.5">0.5 seconds</option>
+                        <option value="1.0" selected>1.0 second</option>
+                        <option value="1.5">1.5 seconds</option>
+                        <option value="2.0">2.0 seconds</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Schedule Options -->
+            <div class="form-group">
+                <label>Schedule Posting: <span class="help-text">(optional)</span></label>
+                <div class="schedule-options">
+                    <input type="number" id="schedule-interval" name="schedule-interval" placeholder="Interval" min="1">
+                    <select id="schedule-unit" name="schedule-unit">
+                        <option value="">Don't Schedule</option>
+                        <option value="minutes">Minutes</option>
+                        <option value="hours">Hours</option>
+                        <option value="days">Days</option>
+                    </select>
+                </div>
+            </div>
+
+            <button type="submit" class="submit-btn">🎬 Generate Clips</button>
+        </form>
+
+        <div id="response"></div>
+        <div id="progress" style="display: none;">
+            <div class="progress-bar">
+                <div class="progress-fill"></div>
+            </div>
+            <p class="progress-text">Processing...</p>
+        </div>
+    </div>
+
     <script src="/static/script.js"></script>
 </body>
 </html>
