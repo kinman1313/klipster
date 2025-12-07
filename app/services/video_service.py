@@ -379,6 +379,27 @@ def find_key_moments(transcription_data):
         for seg in segments
     ])
 
+    # Check if transcript is too long (estimate ~4 chars per token)
+    estimated_tokens = len(timestamped_transcript) / 4
+
+    # If too long for GPT-3.5-turbo (16k limit), use GPT-4-turbo (128k limit)
+    # or chunk the transcript
+    if estimated_tokens > 12000:  # Leave room for system prompt and response
+        print(f"⚠️  Long transcript ({estimated_tokens:.0f} tokens), using GPT-4-turbo for larger context")
+        model = "gpt-4-turbo-preview"
+    else:
+        model = "gpt-3.5-turbo"
+
+    # If still too long even for GPT-4, sample segments
+    if estimated_tokens > 100000:
+        print(f"⚠️  Very long transcript, sampling every 3rd segment...")
+        sampled_segments = segments[::3]  # Take every 3rd segment
+        timestamped_transcript = "\n".join([
+            f"[{seg.get('start', 0):.1f}s - {seg.get('end', 0):.1f}s]: {seg.get('text', '')}"
+            for seg in sampled_segments
+        ])
+        print(f"📊 Reduced from {len(segments)} to {len(sampled_segments)} segments")
+
     system_prompt = """You are an expert video editor that identifies engaging, interesting moments from video transcriptions for social media clips.
 
 REQUIREMENTS:
@@ -406,16 +427,40 @@ Timestamped Transcription:
 
 Remember: Each clip must be 30-120 seconds long. Use the exact timestamps from the transcription."""
 
-    response = openai.chat.completions.create(
-        model="gpt-3.5-turbo",
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt}
-        ],
-        response_format={"type": "json_object"}
-    )
+    try:
+        response = openai.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            response_format={"type": "json_object"}
+        )
 
-    return json.loads(response.choices[0].message.content)
+        return json.loads(response.choices[0].message.content)
+
+    except Exception as e:
+        if "context_length_exceeded" in str(e):
+            # Last resort: take only first 30% of segments
+            print("⚠️  Context still too long, using first 30% of video only...")
+            reduced_segments = segments[:len(segments)//3]
+            timestamped_transcript = "\n".join([
+                f"[{seg.get('start', 0):.1f}s - {seg.get('end', 0):.1f}s]: {seg.get('text', '')}"
+                for seg in reduced_segments
+            ])
+
+            response = openai.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt.replace(timestamped_transcript, timestamped_transcript)}
+                ],
+                response_format={"type": "json_object"}
+            )
+
+            return json.loads(response.choices[0].message.content)
+        else:
+            raise e
 
 def apply_effects(clip, effects_str):
     """
