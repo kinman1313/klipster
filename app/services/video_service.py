@@ -684,8 +684,15 @@ def generate_clips(video_path, transcription_data, subtitle_color='white', emoji
             print(f"Skipping clip {i}: too long ({clip_duration:.1f}s > 120s)")
             continue
 
-        # Create the subclip first
-        clip_segment = video_clip.subclip(start_time, end_time)
+        # Create the subclip first (try different API methods)
+        try:
+            clip_segment = video_clip.subclip(start_time, end_time)
+        except AttributeError:
+            try:
+                clip_segment = video_clip.subclipped(start_time, end_time)
+            except AttributeError:
+                # Some versions use cutout/crop differently
+                clip_segment = video_clip.set_start(start_time).set_end(end_time)
 
         # Apply effects if specified
         if effects:
@@ -703,8 +710,16 @@ def generate_clips(video_path, transcription_data, subtitle_color='white', emoji
             if emojis:
                 subtitle_text = f"{emojis} {subtitle_text}"
 
-            # Try to create subtitle with MoviePy
-            subtitle = create_subtitle_clip(subtitle_text, subtitle_color, clip_segment.w, clip_duration)
+            # Try to create subtitle with MoviePy (get width safely)
+            try:
+                video_width = clip_segment.w
+            except:
+                try:
+                    video_width = clip_segment.size[0]
+                except:
+                    video_width = 1920  # Default HD width
+
+            subtitle = create_subtitle_clip(subtitle_text, subtitle_color, video_width, clip_duration)
 
             if subtitle:
                 # Composite the video and subtitle
@@ -721,8 +736,20 @@ def generate_clips(video_path, transcription_data, subtitle_color='white', emoji
             os.makedirs('clips')
 
         clip_path = os.path.join('clips', f"clip_{i}_{os.path.basename(video_path)}")
-        final_clip.write_videofile(clip_path, codec='libx264')
+
+        # Write video file (try different API methods)
+        try:
+            final_clip.write_videofile(clip_path, codec='libx264', logger=None)
+        except TypeError:
+            # Older versions don't have logger parameter
+            try:
+                final_clip.write_videofile(clip_path, codec='libx264')
+            except AttributeError:
+                # Some versions use different method name
+                final_clip.write_video_file(clip_path, codec='libx264')
+
         clip_paths.append(clip_path)
+        print(f"✅ Generated clip: {os.path.basename(clip_path)}")
 
     return clip_paths
 
