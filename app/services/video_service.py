@@ -155,6 +155,9 @@ def download_video(url):
 
 import openai
 
+# MoviePy 2.2.1 imports - import FX functions properly
+from moviepy.video.fx.all import fadein, fadeout, speedx
+
 def get_transcription_optimized(url):
     """
     OPTIMIZED: Get transcription using the fastest available method.
@@ -335,30 +338,7 @@ from scenedetect.detectors import ContentDetector
 
 import json
 
-# Import moviepy effects - handle different versions
-def get_moviepy_effects():
-    """Get moviepy effect functions compatible with installed version."""
-    try:
-        # Try moviepy 1.0.3+ style
-        from moviepy.video.fx.fadein import fadein
-        from moviepy.video.fx.fadeout import fadeout
-        from moviepy.video.fx.speedx import speedx
-        return fadein, fadeout, speedx
-    except (ImportError, ModuleNotFoundError):
-        try:
-            # Try older import style
-            from moviepy.video.fx import fadein, fadeout, speedx
-            return fadein, fadeout, speedx
-        except (ImportError, AttributeError):
-            try:
-                # Try vfx module style
-                import moviepy.video.fx.all as vfx
-                return vfx.fadein, vfx.fadeout, vfx.speedx
-            except (ImportError, ModuleNotFoundError, AttributeError):
-                # Last resort: return None and we'll handle effects manually
-                return None, None, None
-
-fadein, fadeout, speedx = get_moviepy_effects()
+# Effects imported at top of file - no need for version detection
 
 def find_key_moments(transcription_data, clip_length='30-120', num_clips=3, platform='auto'):
     """
@@ -619,27 +599,13 @@ def apply_effects(clip, effects_str):
         try:
             if effect_name == 'speed':
                 speed_factor = float(effect_value)
-                if speedx is not None:
-                    clip = clip.fx(speedx, speed_factor)
-                else:
-                    try:
-                        clip = clip.speedx(speed_factor)
-                    except AttributeError:
-                        print(f"⚠️  Speed effect not supported in this MoviePy version")
-
+                clip = clip.fx(speedx, speed_factor)
             elif effect_name == 'fadein':
                 duration = float(effect_value)
-                if fadein is not None:
-                    clip = clip.fx(fadein, duration)
-                else:
-                    print(f"⚠️  Fadein effect not available (MoviePy fx imports failed)")
-
+                clip = clip.fx(fadein, duration)
             elif effect_name == 'fadeout':
                 duration = float(effect_value)
-                if fadeout is not None:
-                    clip = clip.fx(fadeout, duration)
-                else:
-                    print(f"⚠️  Fadeout effect not available (MoviePy fx imports failed)")
+                clip = clip.fx(fadeout, duration)
         except (ValueError, TypeError, AttributeError) as e:
             print(f"⚠️  Could not apply effect '{effect}': {e}")
             continue
@@ -648,128 +614,31 @@ def apply_effects(clip, effects_str):
 
 def create_subtitle_clip(text, color, video_width, duration):
     """
-    Create a subtitle TextClip with comprehensive error handling for different MoviePy versions.
-
-    Returns:
-        TextClip or None if creation fails
+    Subtitle TextClip generator for MoviePy 2.2.1.
+    Returns a plain TextClip; positioning is done later in CompositeVideoClip.
     """
     import os
 
-    # Try multiple font options (Windows needs full paths, Linux/Mac can use names)
-    fonts_to_try = []
+    # Try Windows font first, then fallback
+    font = r'C:\Windows\Fonts\arial.ttf' if os.path.exists(r'C:\Windows\Fonts\arial.ttf') else 'Arial'
 
-    # Windows fonts
-    if os.path.exists(r'C:\Windows\Fonts'):
-        fonts_to_try.extend([
-            r'C:\Windows\Fonts\arial.ttf',
-            r'C:\Windows\Fonts\verdana.ttf',
-            r'C:\Windows\Fonts\calibri.ttf',
-            r'C:\Windows\Fonts\times.ttf',
-        ])
-
-    # Linux/Mac fonts
-    fonts_to_try.extend(['Arial', 'Verdana', 'DejaVu-Sans', 'Helvetica'])
-
-    subtitle = None
-
-    # Try different API approaches with different fonts
-    errors = []
-
-    for font in fonts_to_try:
-        if subtitle is not None:
-            break
-
-        # Approach 1: Font as first positional, text keyword, font_size
-        try:
-            clip = TextClip(font, text=text, font_size=24, color=color,
-                          size=(video_width - 100, None), method='caption')
-            # Try to position it
-            subtitle = clip.set_position(('center', 'bottom')).set_duration(duration)
-            print(f"✅ Subtitle method: Font-first positional with set_position, font={font}")
-            return subtitle
-        except Exception as e:
-            errors.append(f"Approach 1 ({font}): {e}")
-
-        # Approach 2: All keyword arguments
-        try:
-            clip = TextClip(text=text, font=font, font_size=24, color=color,
-                          size=(video_width - 100, None), method='caption')
-            subtitle = clip.set_position(('center', 'bottom')).set_duration(duration)
-            print(f"✅ Subtitle method: All keywords with set_position, font={font}")
-            return subtitle
-        except Exception as e:
-            errors.append(f"Approach 2 ({font}): {e}")
-
-        # Approach 3: Minimal parameters, try set_pos instead of set_position
-        try:
-            clip = TextClip(text=text, font=font, fontsize=24, color=color)
-            subtitle = clip.set_pos(('center', 'bottom')).set_duration(duration)
-            print(f"✅ Subtitle method: Minimal with set_pos, font={font}")
-            return subtitle
-        except Exception as e:
-            errors.append(f"Approach 3 ({font}): {e}")
-
-        # Approach 4: set_pos with font_size (common combination)
-        try:
-            clip = TextClip(text=text, font=font, font_size=24, color=color)
-            subtitle = clip.set_pos(('center', 'bottom')).set_duration(duration)
-            print(f"✅ Subtitle method: set_pos with font_size, font={font}")
-            return subtitle
-        except Exception as e:
-            errors.append(f"Approach 4 ({font}): {e}")
-
-        # Approach 5: Font-first positional with set_pos
-        try:
-            clip = TextClip(font, text=text, font_size=24, color=color,
-                          size=(video_width - 100, None), method='caption')
-            subtitle = clip.set_pos(('center', 'bottom')).set_duration(duration)
-            print(f"✅ Subtitle method: Font-first with set_pos, font={font}")
-            return subtitle
-        except Exception as e:
-            errors.append(f"Approach 5 ({font}): {e}")
-
-        # Approach 6: ULTRA MINIMAL - bare bones TextClip (last resort)
-        try:
-            # Create with absolute minimum parameters
-            clip = TextClip(text)
-            # Try to set properties after creation
-            clip = clip.set_duration(duration)
-            try:
-                clip = clip.set_pos(('center', 'bottom'))
-            except:
-                pass  # Position might not work, but at least we have text
-            print(f"✅ Subtitle method: Ultra minimal (bare text only)")
-            return clip
-        except Exception as e:
-            errors.append(f"Approach 6 (minimal): {e}")
-
-    # Approach 7: MoviePy 2.2.1 Official API Pattern
-    for font in fonts_to_try:
-        try:
-            # MoviePy 2.2.1: font as first named param, text second
-            clip = TextClip(
-                font=font,           # First named parameter
-                text=text,           # Second named parameter
-                font_size=24,        # font_size, NOT fontsize
-                color=color,
-                stroke_color='black',
-                stroke_width=2
-            )
-            # Set duration
-            clip = clip.set_duration(duration)
-            # ✓ Just return the clip - positioning happens in CompositeVideoClip!
-            print(f"✅ Subtitle method: MoviePy 2.2.1 official API, font={font}")
-            return clip  # Return unpositioned clip
-        except Exception as e:
-            continue  # Try next font
-
-    # If all attempts failed, print detailed errors and return None
-    print(f"⚠️  All subtitle approaches failed. Errors from first font:")
-    # Show all 5 approaches for the first font to debug
-    first_font_errors = [e for e in errors if 'arial.ttf' in e.lower()][:5]
-    for err in first_font_errors:
-        print(f"   - {err}")
-    return None
+    try:
+        # MoviePy 2.2.1 official pattern
+        clip = TextClip(
+            text=text,
+            font=font,
+            font_size=24,                       # 2.2.1 uses font_size
+            color=color,
+            size=(video_width - 100, None),     # wrap to width
+            method="caption",                   # multi-line captions
+            stroke_color="black",
+            stroke_width=2,
+        )
+        print(f"✅ Subtitle created with MoviePy 2.2.1 API, font={font}")
+        return clip.set_duration(duration)
+    except Exception as e:
+        print(f"⚠️  Could not create subtitle: {e}")
+        return None
 
 def analyze_content_features(segments):
     """
