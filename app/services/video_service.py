@@ -728,6 +728,21 @@ def create_subtitle_clip(text, color, video_width, duration):
         except Exception as e:
             errors.append(f"Approach 5 ({font}): {e}")
 
+        # Approach 6: ULTRA MINIMAL - bare bones TextClip (last resort)
+        try:
+            # Create with absolute minimum parameters
+            clip = TextClip(text)
+            # Try to set properties after creation
+            clip = clip.set_duration(duration)
+            try:
+                clip = clip.set_pos(('center', 'bottom'))
+            except:
+                pass  # Position might not work, but at least we have text
+            print(f"✅ Subtitle method: Ultra minimal (bare text only)")
+            return clip
+        except Exception as e:
+            errors.append(f"Approach 6 (minimal): {e}")
+
     # If all attempts failed, print detailed errors and return None
     print(f"⚠️  All subtitle approaches failed. Errors from first font:")
     # Show all 5 approaches for the first font to debug
