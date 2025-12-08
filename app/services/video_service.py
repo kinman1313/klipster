@@ -757,10 +757,9 @@ def create_subtitle_clip(text, color, video_width, duration):
             )
             # Set duration
             clip = clip.set_duration(duration)
-            # MoviePy 2.x: set_position() returns new positioned clip
-            positioned_clip = clip.set_position(("center", "bottom"))
+            # ✓ Just return the clip - positioning happens in CompositeVideoClip!
             print(f"✅ Subtitle method: MoviePy 2.2.1 official API, font={font}")
-            return positioned_clip
+            return clip  # Return unpositioned clip
         except Exception as e:
             continue  # Try next font
 
@@ -895,8 +894,14 @@ def generate_clips(video_path, transcription_data, subtitle_color='white', emoji
             subtitle = create_subtitle_clip(subtitle_text, subtitle_color, video_width, clip_duration)
 
             if subtitle:
-                # Composite the video and subtitle
-                final_clip = CompositeVideoClip([clip_segment, subtitle])
+                # Position subtitle in CompositeVideoClip (MoviePy 2.x pattern)
+                try:
+                    positioned_subtitle = subtitle.set_position(("center", "bottom"))
+                except AttributeError:
+                    # Fallback: try without positioning
+                    positioned_subtitle = subtitle
+
+                final_clip = CompositeVideoClip([clip_segment, positioned_subtitle])
                 print(f"✅ Added subtitles to clip {i}")
             else:
                 print(f"⚠️  Skipping subtitles for clip {i} (not critical)")
