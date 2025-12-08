@@ -729,8 +729,10 @@ def create_subtitle_clip(text, color, video_width, duration):
             errors.append(f"Approach 5 ({font}): {e}")
 
     # If all attempts failed, print detailed errors and return None
-    print(f"⚠️  All subtitle approaches failed. Sample errors:")
-    for err in errors[:3]:  # Show first 3 errors
+    print(f"⚠️  All subtitle approaches failed. Errors from first font:")
+    # Show all 5 approaches for the first font to debug
+    first_font_errors = [e for e in errors if 'arial.ttf' in e.lower()][:5]
+    for err in first_font_errors:
         print(f"   - {err}")
     return None
 
