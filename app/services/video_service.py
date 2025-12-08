@@ -743,20 +743,24 @@ def create_subtitle_clip(text, color, video_width, duration):
         except Exception as e:
             errors.append(f"Approach 6 (minimal): {e}")
 
-    # Approach 7: Set position DURING creation (not after)
+    # Approach 7: MoviePy 2.x API - set_position AFTER creation, then return
     for font in fonts_to_try:
         try:
-            # Try passing position as parameter during TextClip creation
+            # MoviePy 2.x: Create TextClip without position
             clip = TextClip(
                 text=text,
                 font=font,
-                font_size=24,
+                font_size=24,  # MoviePy 2.x uses font_size, not fontsize
                 color=color,
-                pos=('center', 'bottom')  # Position during creation, not after!
+                stroke_color='black',  # Add stroke for better visibility
+                stroke_width=1
             )
+            # Set duration first
             clip = clip.set_duration(duration)
-            print(f"✅ Subtitle method: Position during creation, font={font}")
-            return clip
+            # MoviePy 2.x: Use set_position() to return positioned clip
+            subtitle = clip.set_position(('center', 'bottom'))
+            print(f"✅ Subtitle method: MoviePy 2.x API (set_position after creation), font={font}")
+            return subtitle
         except Exception as e:
             continue  # Try next font
 
