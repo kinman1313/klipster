@@ -37,6 +37,7 @@ document.getElementById('clip-form').addEventListener('submit', async (event) =>
     const emojis = document.getElementById('emojis').value;
     const scheduleInterval = document.getElementById('schedule-interval').value;
     const scheduleUnit = document.getElementById('schedule-unit').value;
+    const platform = document.getElementById('platform').value;
     const clipLength = document.getElementById('clip-length').value;
     const numClips = parseInt(document.getElementById('num-clips').value);
 
@@ -77,6 +78,7 @@ document.getElementById('clip-form').addEventListener('submit', async (event) =>
                 effects: effectsString || null,
                 schedule_interval: scheduleInterval || null,
                 schedule_unit: (scheduleUnit && scheduleInterval) ? scheduleUnit : null,
+                platform: platform,
                 clip_length: clipLength,
                 num_clips: numClips
             })

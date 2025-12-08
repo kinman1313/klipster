@@ -360,20 +360,22 @@ def get_moviepy_effects():
 
 fadein, fadeout, speedx = get_moviepy_effects()
 
-def find_key_moments(transcription_data, clip_length='30-120', num_clips=3):
+def find_key_moments(transcription_data, clip_length='30-120', num_clips=3, platform='auto'):
     """
-    OPTIMIZED: Analyze transcription using smart sampling to minimize token usage.
+    OPTIMIZED: Analyze transcription using smart sampling + content analysis for engagement.
 
-    Token Optimization Strategy:
-    - Condenses transcript format (timestamps only at time ranges)
-    - Intelligent sampling based on video length
-    - Always tries GPT-3.5-turbo first (cheaper)
-    - Reduces tokens by 80-90% vs sending full transcript
+    Features:
+    - Platform-specific optimization (TikTok, YouTube, Instagram, LinkedIn)
+    - Hook detection (first 5s analysis)
+    - Question detection (engagement magnets)
+    - Emotional spike detection (viral potential)
+    - Condenses transcript format (reduces tokens by 80-90%)
 
     Args:
         transcription_data: Dict with 'text' and 'segments'
         clip_length: Desired clip length range (e.g., "30-60", "60-90", "90-120", "30-120")
         num_clips: Number of clips to generate
+        platform: Platform optimization (auto, tiktok, youtube, instagram, linkedin)
 
     Returns:
         Dict with 'moments' list
@@ -444,7 +446,53 @@ def find_key_moments(transcription_data, clip_length='30-120', num_clips=3):
     estimated_tokens = len(compact_transcript) / 4
     print(f"💰 Estimated tokens: {estimated_tokens:.0f} (vs {len(' '.join([s.get('text', '') for s in segments]))/4:.0f} original)")
 
+    # Analyze content for engagement features
+    features = analyze_content_features(segments)
+    print(f"🎯 Detected: {len(features['hooks'])} hooks, {len(features['questions'])} questions, {len(features['emotional_moments'])} emotional moments")
+
+    # Platform-specific optimization criteria
+    platform_criteria = {
+        'tiktok': """
+TIKTOK OPTIMIZATION:
+- STRONG HOOK in first 3 seconds (question, shocking statement, or bold claim)
+- Fast-paced, high energy content
+- Viral language (amazing, insane, shocking, unbelievable)
+- Questions that create curiosity
+- Relatable or trending topics
+- Clear payoff/punchline""",
+        'youtube': """
+YOUTUBE SHORTS OPTIMIZATION:
+- Clear narrative arc (beginning, middle, end)
+- Strong hook that sets up a story
+- Educational or entertaining value
+- Clear resolution/conclusion
+- Curiosity-driven content (How/Why questions)""",
+        'instagram': """
+INSTAGRAM REELS OPTIMIZATION:
+- Visually interesting content
+- Aesthetic or inspirational moments
+- Relatable experiences
+- Emotional resonance
+- Lifestyle or aspirational content""",
+        'linkedin': """
+LINKEDIN OPTIMIZATION:
+- Professional insights or lessons
+- Industry expertise or thought leadership
+- Career advice or business strategies
+- Data-driven or research-backed points
+- Actionable takeaways for professionals""",
+        'auto': """
+AUTO OPTIMIZATION:
+- Prioritize universal engagement (works across all platforms)
+- Strong hooks + complete stories
+- Mix of entertainment and value"""
+    }
+
+    platform_text = platform_criteria.get(platform, platform_criteria['auto'])
+
     system_prompt = f"""You are an expert video editor that identifies engaging, interesting moments from video transcriptions for social media clips.
+
+{platform_text}
 
 REQUIREMENTS:
 - Each clip MUST be between {min_length} and {max_length} seconds long
@@ -686,7 +734,54 @@ def create_subtitle_clip(text, color, video_width, duration):
         print(f"   - {err}")
     return None
 
-def generate_clips(video_path, transcription_data, subtitle_color='white', emojis=None, effects=None, clip_length='30-120', num_clips=3):
+def analyze_content_features(segments):
+    """
+    Analyze transcript for engagement features: hooks, questions, emotional content.
+
+    Returns:
+        dict with 'hooks', 'questions', and 'emotional_moments' lists
+    """
+    features = {
+        'hooks': [],
+        'questions': [],
+        'emotional_moments': []
+    }
+
+    # Question indicators
+    question_words = ['what', 'why', 'how', 'when', 'where', 'who', 'which', 'would', 'could', 'should', 'can', 'is', 'are', 'do', 'does']
+
+    # Emotional/viral language indicators
+    excitement_words = ['amazing', 'incredible', 'unbelievable', 'shocking', 'insane', 'crazy', 'wild', 'epic', 'awesome', 'wow', 'omg', 'literally', 'actually', 'seriously', 'honestly']
+    humor_words = ['funny', 'hilarious', 'joke', 'laugh', 'haha', 'lol', 'ridiculous', 'absurd']
+    controversial_words = ['controversial', 'debate', 'disagree', 'wrong', 'problem', 'issue', 'challenge', 'danger', 'risk', 'threat']
+
+    for i, seg in enumerate(segments):
+        text = seg.get('text', '').lower()
+        start = seg.get('start', 0)
+        end = seg.get('end', 0)
+
+        # Hook detection (first 5 seconds of potential clips)
+        if i % 10 == 0:  # Check every ~10 segments (potential clip starts)
+            hook_text = ' '.join([s.get('text', '') for s in segments[i:min(i+3, len(segments))]])
+            if any(word in hook_text.lower() for word in excitement_words + question_words[:5]):
+                features['hooks'].append({'time': start, 'text': hook_text[:100]})
+
+        # Question detection
+        if '?' in text or any(text.startswith(qw) for qw in question_words):
+            features['questions'].append({'time': start, 'text': text[:100]})
+
+        # Emotional content detection
+        emotional_score = (
+            sum(word in text for word in excitement_words) +
+            sum(word in text for word in humor_words) +
+            sum(word in text for word in controversial_words)
+        )
+        if emotional_score >= 2:  # At least 2 emotional indicators
+            features['emotional_moments'].append({'time': start, 'score': emotional_score, 'text': text[:100]})
+
+    return features
+
+def generate_clips(video_path, transcription_data, subtitle_color='white', emojis=None, effects=None, clip_length='30-120', num_clips=3, platform='auto'):
     """
     Generate video clips from key moments identified in the transcription.
 
@@ -698,11 +793,12 @@ def generate_clips(video_path, transcription_data, subtitle_color='white', emoji
         effects: Optional effects string (e.g., "speed:1.5,fadein:0.5")
         clip_length: Desired clip length range (e.g., "30-60", "60-90", "90-120", "30-120")
         num_clips: Number of clips to generate (default: 3)
+        platform: Platform optimization (auto, tiktok, youtube, instagram, linkedin)
 
     Returns:
         List of paths to generated clip files
     """
-    key_moments = find_key_moments(transcription_data, clip_length, num_clips)
+    key_moments = find_key_moments(transcription_data, clip_length, num_clips, platform)
     video_clip = VideoFileClip(video_path)
     clip_paths = []
     segments = transcription_data.get('segments', [])
