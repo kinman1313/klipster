@@ -155,8 +155,18 @@ def download_video(url):
 
 import openai
 
-# MoviePy 2.2.1 imports - import FX functions properly
-from moviepy.video.fx.all import fadein, fadeout, speedx
+# MoviePy 2.2.1 imports - try different import paths
+try:
+    from moviepy.video.fx.fadein import fadein
+    from moviepy.video.fx.fadeout import fadeout
+    from moviepy.video.fx.speedx import speedx
+except ImportError:
+    try:
+        from moviepy.video.fx.all import fadein, fadeout, speedx
+    except ImportError:
+        # Fallback: effects will be None and we'll skip them
+        fadein = fadeout = speedx = None
+        print("⚠️  MoviePy effects not available")
 
 def get_transcription_optimized(url):
     """
@@ -597,13 +607,13 @@ def apply_effects(clip, effects_str):
         effect_name = effect_name.strip().lower()
 
         try:
-            if effect_name == 'speed':
+            if effect_name == 'speed' and speedx:
                 speed_factor = float(effect_value)
                 clip = clip.fx(speedx, speed_factor)
-            elif effect_name == 'fadein':
+            elif effect_name == 'fadein' and fadein:
                 duration = float(effect_value)
                 clip = clip.fx(fadein, duration)
-            elif effect_name == 'fadeout':
+            elif effect_name == 'fadeout' and fadeout:
                 duration = float(effect_value)
                 clip = clip.fx(fadeout, duration)
         except (ValueError, TypeError, AttributeError) as e:
