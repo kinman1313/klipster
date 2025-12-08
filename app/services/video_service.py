@@ -574,24 +574,26 @@ def apply_effects(clip, effects_str):
                 if speedx is not None:
                     clip = clip.fx(speedx, speed_factor)
                 else:
-                    # Manual speed effect if import failed
-                    clip = clip.speedx(speed_factor)
+                    try:
+                        clip = clip.speedx(speed_factor)
+                    except AttributeError:
+                        print(f"⚠️  Speed effect not supported in this MoviePy version")
+
             elif effect_name == 'fadein':
                 duration = float(effect_value)
                 if fadein is not None:
                     clip = clip.fx(fadein, duration)
                 else:
-                    # Manual fadein if import failed
-                    clip = clip.fadein(duration)
+                    print(f"⚠️  Fadein effect not available (MoviePy fx imports failed)")
+
             elif effect_name == 'fadeout':
                 duration = float(effect_value)
                 if fadeout is not None:
                     clip = clip.fx(fadeout, duration)
                 else:
-                    # Manual fadeout if import failed
-                    clip = clip.fadeout(duration)
+                    print(f"⚠️  Fadeout effect not available (MoviePy fx imports failed)")
         except (ValueError, TypeError, AttributeError) as e:
-            print(f"Warning: Could not apply effect '{effect}': {e}")
+            print(f"⚠️  Could not apply effect '{effect}': {e}")
             continue
 
     return clip
@@ -658,6 +660,25 @@ def create_subtitle_clip(text, color, video_width, duration):
             return subtitle
         except Exception as e:
             errors.append(f"Approach 3 ({font}): {e}")
+
+        # Approach 4: set_pos with font_size (common combination)
+        try:
+            clip = TextClip(text=text, font=font, font_size=24, color=color)
+            subtitle = clip.set_pos(('center', 'bottom')).set_duration(duration)
+            print(f"✅ Subtitle method: set_pos with font_size, font={font}")
+            return subtitle
+        except Exception as e:
+            errors.append(f"Approach 4 ({font}): {e}")
+
+        # Approach 5: Font-first positional with set_pos
+        try:
+            clip = TextClip(font, text=text, font_size=24, color=color,
+                          size=(video_width - 100, None), method='caption')
+            subtitle = clip.set_pos(('center', 'bottom')).set_duration(duration)
+            print(f"✅ Subtitle method: Font-first with set_pos, font={font}")
+            return subtitle
+        except Exception as e:
+            errors.append(f"Approach 5 ({font}): {e}")
 
     # If all attempts failed, print detailed errors and return None
     print(f"⚠️  All subtitle approaches failed. Sample errors:")
