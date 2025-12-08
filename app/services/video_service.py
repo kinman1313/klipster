@@ -743,6 +743,23 @@ def create_subtitle_clip(text, color, video_width, duration):
         except Exception as e:
             errors.append(f"Approach 6 (minimal): {e}")
 
+    # Approach 7: Set position DURING creation (not after)
+    for font in fonts_to_try:
+        try:
+            # Try passing position as parameter during TextClip creation
+            clip = TextClip(
+                text=text,
+                font=font,
+                font_size=24,
+                color=color,
+                pos=('center', 'bottom')  # Position during creation, not after!
+            )
+            clip = clip.set_duration(duration)
+            print(f"✅ Subtitle method: Position during creation, font={font}")
+            return clip
+        except Exception as e:
+            continue  # Try next font
+
     # If all attempts failed, print detailed errors and return None
     print(f"⚠️  All subtitle approaches failed. Errors from first font:")
     # Show all 5 approaches for the first font to debug
