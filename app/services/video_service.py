@@ -643,9 +643,10 @@ def create_subtitle_clip(text, color, video_width, duration):
             method="caption",                   # multi-line captions
             stroke_color="black",
             stroke_width=2,
+            duration=duration,                  # Set duration in constructor, not via method
         )
         print(f"✅ Subtitle created with MoviePy 2.2.1 API, font={font}")
-        return clip.set_duration(duration)
+        return clip  # Return clip directly
     except Exception as e:
         print(f"⚠️  Could not create subtitle: {e}")
         return None
