@@ -58,6 +58,8 @@ def create_app():
         effects = data.get('effects')
         schedule_interval = data.get('schedule_interval')
         schedule_unit = data.get('schedule_unit')
+        clip_length = data.get('clip_length', '30-120')  # Default: Auto
+        num_clips = data.get('num_clips', 3)  # Default: 3 clips
 
         if not youtube_url:
             return jsonify({'error': 'URL is required'}), 400
@@ -81,7 +83,7 @@ def create_app():
 
             # 3. Generate clips with the transcription
             print("✂️  Generating clips from key moments...")
-            clip_paths = generate_clips(video_path, transcription_data, subtitle_color, emojis, effects)
+            clip_paths = generate_clips(video_path, transcription_data, subtitle_color, emojis, effects, clip_length, num_clips)
 
             # Extract full text for storage in database
             full_transcription = transcription_data.get('text', '')

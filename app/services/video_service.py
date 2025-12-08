@@ -360,7 +360,7 @@ def get_moviepy_effects():
 
 fadein, fadeout, speedx = get_moviepy_effects()
 
-def find_key_moments(transcription_data):
+def find_key_moments(transcription_data, clip_length='30-120', num_clips=3):
     """
     OPTIMIZED: Analyze transcription using smart sampling to minimize token usage.
 
@@ -372,10 +372,14 @@ def find_key_moments(transcription_data):
 
     Args:
         transcription_data: Dict with 'text' and 'segments'
+        clip_length: Desired clip length range (e.g., "30-60", "60-90", "90-120", "30-120")
+        num_clips: Number of clips to generate
 
     Returns:
         Dict with 'moments' list
     """
+    # Parse clip length range
+    min_length, max_length = map(int, clip_length.split('-'))
     segments = transcription_data.get('segments', [])
 
     if not segments:
@@ -440,32 +444,33 @@ def find_key_moments(transcription_data):
     estimated_tokens = len(compact_transcript) / 4
     print(f"💰 Estimated tokens: {estimated_tokens:.0f} (vs {len(' '.join([s.get('text', '') for s in segments]))/4:.0f} original)")
 
-    system_prompt = """You are an expert video editor that identifies engaging, interesting moments from video transcriptions for social media clips.
+    system_prompt = f"""You are an expert video editor that identifies engaging, interesting moments from video transcriptions for social media clips.
 
 REQUIREMENTS:
-- Each clip MUST be between 30 seconds and 2 minutes (120 seconds) long
-- Identify moments that are self-contained, interesting, funny, insightful, or have viral potential
+- Each clip MUST be between {min_length} and {max_length} seconds long
+- Identify EXACTLY {num_clips} moments (no more, no less)
+- Moments should be self-contained, interesting, funny, insightful, or have viral potential
 - Use the actual timestamps provided in the transcription
-- Aim for 3-5 key moments from the video
 - Each moment should have clear start and end times
+- Prioritize the MOST engaging content
 
 Respond ONLY with valid JSON in this exact format:
-{
+{{
   "moments": [
-    {
+    {{
       "start_time": 10.5,
       "end_time": 45.2,
       "text": "Brief description of what makes this moment interesting"
-    }
+    }}
   ]
-}"""
+}}"""
 
-    user_prompt = f"""Analyze this timestamped transcription and identify 3-5 key moments suitable for social media clips.
+    user_prompt = f"""Analyze this timestamped transcription and identify EXACTLY {num_clips} key moments suitable for social media clips.
 
 Timestamped Transcription:
 {compact_transcript}
 
-Remember: Each clip must be 30-120 seconds long. Use the exact timestamps from the transcription."""
+Remember: Each clip must be {min_length}-{max_length} seconds long. Provide EXACTLY {num_clips} clips. Use the exact timestamps from the transcription."""
 
     # ALWAYS try GPT-3.5-turbo first (cheapest), then fallback to more expensive models
     models_to_try = ["gpt-3.5-turbo", "gpt-4o", "gpt-4-turbo", "gpt-4"]
@@ -522,12 +527,12 @@ Remember: Each clip must be 30-120 seconds long. Use the exact timestamps from t
 
     ultra_compact_transcript = "\n".join(ultra_compact)
 
-    user_prompt_ultra = f"""Analyze this timestamped transcription and identify 2-3 key moments suitable for social media clips.
+    user_prompt_ultra = f"""Analyze this timestamped transcription and identify {min(num_clips, 3)} key moments suitable for social media clips.
 
 Timestamped Transcription:
 {ultra_compact_transcript}
 
-Remember: Each clip must be 30-120 seconds long. Use the exact timestamps from the transcription."""
+Remember: Each clip must be {min_length}-{max_length} seconds long. Use the exact timestamps from the transcription."""
 
     response = openai.chat.completions.create(
         model="gpt-3.5-turbo",
@@ -618,6 +623,8 @@ def create_subtitle_clip(text, color, video_width, duration):
     subtitle = None
 
     # Try different API approaches with different fonts
+    errors = []
+
     for font in fonts_to_try:
         if subtitle is not None:
             break
@@ -628,31 +635,37 @@ def create_subtitle_clip(text, color, video_width, duration):
                           size=(video_width - 100, None), method='caption')
             # Try to position it
             subtitle = clip.set_position(('center', 'bottom')).set_duration(duration)
+            print(f"✅ Subtitle method: Font-first positional with set_position, font={font}")
             return subtitle
-        except:
-            pass
+        except Exception as e:
+            errors.append(f"Approach 1 ({font}): {e}")
 
         # Approach 2: All keyword arguments
         try:
             clip = TextClip(text=text, font=font, font_size=24, color=color,
                           size=(video_width - 100, None), method='caption')
             subtitle = clip.set_position(('center', 'bottom')).set_duration(duration)
+            print(f"✅ Subtitle method: All keywords with set_position, font={font}")
             return subtitle
-        except:
-            pass
+        except Exception as e:
+            errors.append(f"Approach 2 ({font}): {e}")
 
         # Approach 3: Minimal parameters, try set_pos instead of set_position
         try:
             clip = TextClip(text=text, font=font, fontsize=24, color=color)
             subtitle = clip.set_pos(('center', 'bottom')).set_duration(duration)
+            print(f"✅ Subtitle method: Minimal with set_pos, font={font}")
             return subtitle
-        except:
-            pass
+        except Exception as e:
+            errors.append(f"Approach 3 ({font}): {e}")
 
-    # If all attempts failed, return None (clip will be generated without subtitles)
+    # If all attempts failed, print detailed errors and return None
+    print(f"⚠️  All subtitle approaches failed. Sample errors:")
+    for err in errors[:3]:  # Show first 3 errors
+        print(f"   - {err}")
     return None
 
-def generate_clips(video_path, transcription_data, subtitle_color='white', emojis=None, effects=None):
+def generate_clips(video_path, transcription_data, subtitle_color='white', emojis=None, effects=None, clip_length='30-120', num_clips=3):
     """
     Generate video clips from key moments identified in the transcription.
 
@@ -662,26 +675,31 @@ def generate_clips(video_path, transcription_data, subtitle_color='white', emoji
         subtitle_color: Color for subtitle text (default: white)
         emojis: Optional emoji string to prepend to subtitles
         effects: Optional effects string (e.g., "speed:1.5,fadein:0.5")
+        clip_length: Desired clip length range (e.g., "30-60", "60-90", "90-120", "30-120")
+        num_clips: Number of clips to generate (default: 3)
 
     Returns:
         List of paths to generated clip files
     """
-    key_moments = find_key_moments(transcription_data)
+    key_moments = find_key_moments(transcription_data, clip_length, num_clips)
     video_clip = VideoFileClip(video_path)
     clip_paths = []
     segments = transcription_data.get('segments', [])
+
+    # Parse clip length range for validation
+    min_length, max_length = map(int, clip_length.split('-'))
 
     for i, moment in enumerate(key_moments['moments']):
         start_time = moment['start_time']
         end_time = moment['end_time']
         clip_duration = end_time - start_time
 
-        # Validate clip duration (30 seconds to 2 minutes)
-        if clip_duration < 30:
-            print(f"Skipping clip {i}: too short ({clip_duration:.1f}s < 30s)")
+        # Validate clip duration with user-specified range
+        if clip_duration < min_length:
+            print(f"Skipping clip {i}: too short ({clip_duration:.1f}s < {min_length}s)")
             continue
-        if clip_duration > 120:
-            print(f"Skipping clip {i}: too long ({clip_duration:.1f}s > 120s)")
+        if clip_duration > max_length:
+            print(f"Skipping clip {i}: too long ({clip_duration:.1f}s > {max_length}s)")
             continue
 
         # Create the subclip first (try different API methods)

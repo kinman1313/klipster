@@ -18,6 +18,28 @@
                 <input type="text" id="youtube-url" name="youtube-url" placeholder="https://www.youtube.com/watch?v=..." required>
             </div>
 
+            <!-- Clip Settings -->
+            <div class="form-group">
+                <label for="clip-length">Clip Length:</label>
+                <select id="clip-length" name="clip-length">
+                    <option value="30-60">30-60 seconds (Short & Snappy)</option>
+                    <option value="60-90" selected>60-90 seconds (Balanced)</option>
+                    <option value="90-120">90-120 seconds (Detailed)</option>
+                    <option value="30-120">30-120 seconds (Auto - AI decides)</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="num-clips">Number of Clips:</label>
+                <select id="num-clips" name="num-clips">
+                    <option value="2">2 clips</option>
+                    <option value="3" selected>3 clips</option>
+                    <option value="4">4 clips</option>
+                    <option value="6">6 clips</option>
+                    <option value="8">8 clips</option>
+                </select>
+            </div>
+
             <!-- Subtitle Options -->
             <div class="form-group">
                 <label for="subtitle-color">Subtitle Color:</label>

@@ -37,6 +37,8 @@ document.getElementById('clip-form').addEventListener('submit', async (event) =>
     const emojis = document.getElementById('emojis').value;
     const scheduleInterval = document.getElementById('schedule-interval').value;
     const scheduleUnit = document.getElementById('schedule-unit').value;
+    const clipLength = document.getElementById('clip-length').value;
+    const numClips = parseInt(document.getElementById('num-clips').value);
 
     // Build effects string from checkboxes
     const effects = [];
@@ -74,7 +76,9 @@ document.getElementById('clip-form').addEventListener('submit', async (event) =>
                 emojis: emojis || null,
                 effects: effectsString || null,
                 schedule_interval: scheduleInterval || null,
-                schedule_unit: (scheduleUnit && scheduleInterval) ? scheduleUnit : null
+                schedule_unit: (scheduleUnit && scheduleInterval) ? scheduleUnit : null,
+                clip_length: clipLength,
+                num_clips: numClips
             })
         });
 
